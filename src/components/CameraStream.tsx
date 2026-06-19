@@ -16,9 +16,11 @@ interface CameraStreamProps {
 
 export function CameraStream({ id, name, location, status, imageUrl }: CameraStreamProps) {
   const [time, setTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
   
   // Simulate frame updates every second by updating the timestamp overlay
   useEffect(() => {
+    setMounted(true);
     const interval = setInterval(() => {
       setTime(new Date());
     }, 1000);
@@ -58,7 +60,7 @@ export function CameraStream({ id, name, location, status, imageUrl }: CameraStr
             </div>
 
             <div className="absolute bottom-2 right-2 text-white font-mono text-[9px] drop-shadow-md">
-               {format(time, "yyyy-MM-dd HH:mm:ss")}
+               {mounted ? format(time, "yyyy-MM-dd HH:mm:ss") : "--:--:--"}
             </div>
             
             <div className="absolute bottom-2 left-2 text-white font-mono text-[9px] drop-shadow-md">
