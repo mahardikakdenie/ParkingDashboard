@@ -1,12 +1,14 @@
 "use client";
 
-import { Video, ScanText } from "lucide-react";
+import { Video, ScanText, LogIn, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
   { icon: Video, label: "Dashboard", href: "/" },
   { icon: ScanText, label: "OCR Scanner", href: "/ocr" },
+  { icon: LogIn, label: "Gate In (Entry)", href: "/gate/in" },
+  { icon: LogOut, label: "Gate Out (Exit)", href: "/gate/out" },
 ];
 
 export function Sidebar() {
