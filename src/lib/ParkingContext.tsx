@@ -19,12 +19,15 @@ interface ParkingContextType {
   addSession: (session: Omit<ParkingSession, "id" | "status" | "entryTime">) => ParkingSession;
   completeSession: (id: string, fee: number) => void;
   findActiveSession: (identifier: string, plateNumber?: string) => ParkingSession | undefined;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
 }
 
 const ParkingContext = createContext<ParkingContextType | undefined>(undefined);
 
 export function ParkingProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<ParkingSession[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Seed initial data if empty for demo purposes
   useEffect(() => {
@@ -96,7 +99,7 @@ export function ParkingProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ParkingContext.Provider value={{ sessions, addSession, completeSession, findActiveSession }}>
+    <ParkingContext.Provider value={{ sessions, addSession, completeSession, findActiveSession, sidebarOpen, setSidebarOpen }}>
       {children}
     </ParkingContext.Provider>
   );

@@ -1,11 +1,18 @@
+"use client";
+
 import { Bell, Search, Menu } from "lucide-react";
-import Image from "next/image";
+import { useParking } from "@/lib/ParkingContext";
 
 export function TopNav() {
+  const { sidebarOpen, setSidebarOpen } = useParking();
+
   return (
     <header className="h-16 border-b border-slate-700 bg-[#1E293B]/50 px-6 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-6">
-        <button className="md:hidden text-slate-400 hover:text-white mr-2">
+        <button 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="md:hidden text-slate-400 hover:text-white mr-2"
+        >
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex flex-col">
