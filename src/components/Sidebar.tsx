@@ -1,6 +1,6 @@
 "use client";
 
-import { Video, ScanText, LogIn, LogOut, X } from "lucide-react";
+import { Video, ScanText, LogIn, LogOut, X, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useParking } from "@/lib/ParkingContext";
@@ -10,6 +10,7 @@ const navItems = [
   { icon: ScanText, label: "OCR Scanner", href: "/ocr" },
   { icon: LogIn, label: "Gate In (Entry)", href: "/gate/in" },
   { icon: LogOut, label: "Gate Out (Exit)", href: "/gate/out" },
+  { icon: Gamepad2, label: "3D Parking Demo", href: "/demo" },
 ];
 
 export function Sidebar() {
