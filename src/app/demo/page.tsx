@@ -40,14 +40,6 @@ export default function DemoPage() {
     resetSimulation,
   } = useParkingSimulation();
 
-  const [carPosition, setCarPosition] = useState({ x: 0, z: 0 });
-  const [carRotation, setCarRotation] = useState(0);
-
-  const handlePositionUpdate = useCallback((x: number, z: number, rot: number) => {
-    setCarPosition({ x, z });
-    setCarRotation(rot);
-  }, []);
-
   return (
     <div className="relative w-full h-full bg-[#020818]">
       {/* 3D Canvas Layer */}
@@ -58,7 +50,6 @@ export default function DemoPage() {
           onExitedEntryGate={onCarPassedEntryGate}
           onExitZone={triggerExitOcr}
           onExitedExitGate={onCarPassedExitGate}
-          onPositionUpdate={handlePositionUpdate}
         />
       </div>
 
@@ -66,8 +57,6 @@ export default function DemoPage() {
       <SimulationHUD
         state={state}
         onReset={resetSimulation}
-        carPosition={carPosition}
-        carRotation={carRotation}
       />
 
       <OcrOverlay state={state} />

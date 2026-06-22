@@ -306,7 +306,7 @@ export default function GateInPage() {
                       /* Ticket print rendering */
                       <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[10px] shadow-lg max-w-[220px] mx-auto text-center flex flex-col items-center">
                         <div className="font-bold border-b border-dashed border-slate-900 pb-1.5 w-full uppercase tracking-wider text-xs">
-                          TICKET PARKFLOW.AI
+                          TICKET Udin Park
                         </div>
                         <div className="py-3 flex flex-col items-center w-full">
                           {/* Simulated QR Code using style */}

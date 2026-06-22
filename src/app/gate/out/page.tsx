@@ -342,7 +342,7 @@ export default function GateOutPage() {
                 {activeSession && paymentStep === "SUCCESS" ? (
                   <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[9px] shadow-lg max-w-[220px] mx-auto text-left space-y-2">
                     <div className="text-center font-bold border-b border-dashed border-slate-900 pb-1.5 w-full uppercase tracking-wider text-xs">
-                      INVOICE PARKFLOW.AI
+                      INVOICE Udin Park
                     </div>
                     <div className="space-y-1 pt-1.5">
                       <div>PLAT: <span className="font-bold">{activeSession.plateNumber}</span></div>

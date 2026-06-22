@@ -31,7 +31,7 @@ interface CarControllerProps {
   onExitedEntryGate: () => void;
   onExitZone: () => void;
   onExitedExitGate: () => void;
-  onPositionUpdate: (x: number, z: number, rot: number) => void;
+  carPosRef: React.RefObject<{ x: number; z: number; rot: number }>;
 }
 
 function CarController({
@@ -40,7 +40,7 @@ function CarController({
   onExitedEntryGate,
   onExitZone,
   onExitedExitGate,
-  onPositionUpdate,
+  carPosRef,
 }: CarControllerProps) {
   const movement = useCarControls();
   const posRef = useRef(new THREE.Vector3(-4.5, 0, 24));
@@ -168,7 +168,19 @@ function CarController({
       }
     }
 
-    onPositionUpdate(posRef.current.x, posRef.current.z, rotRef.current);
+    // Mutate the shared ref
+    if (carPosRef.current) {
+      carPosRef.current.x = posRef.current.x;
+      carPosRef.current.z = posRef.current.z;
+      carPosRef.current.rot = rotRef.current;
+    }
+
+    // Dispatch event for HUD minimap (runs outside canvas)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("car-moved", {
+        detail: { x: posRef.current.x, z: posRef.current.z, rot: rotRef.current }
+      }));
+    }
   });
 
   return (
@@ -179,19 +191,21 @@ function CarController({
 }
 
 // Follow camera
-function FollowCamera({ targetPos }: { targetPos: { x: number; z: number }; targetRot: number }) {
+function FollowCamera({ carPosRef }: { carPosRef: React.RefObject<{ x: number; z: number; rot: number }> }) {
   const { camera } = useThree();
   const smoothPos = useRef(new THREE.Vector3(-4.5, 8, 35));
 
   useFrame(() => {
+    const target = carPosRef.current;
+    if (!target) return;
     const desired = new THREE.Vector3(
-      targetPos.x,
-      targetPos.x * 0 + 9, // height
-      targetPos.z + 11
+      target.x,
+      9, // height
+      target.z + 11
     );
     smoothPos.current.lerp(desired, 0.04);
     camera.position.copy(smoothPos.current);
-    camera.lookAt(new THREE.Vector3(targetPos.x, 0.5, targetPos.z - 2));
+    camera.lookAt(new THREE.Vector3(target.x, 0.5, target.z - 2));
   });
 
   return null;
@@ -203,7 +217,6 @@ interface ParkingSceneProps {
   onExitedEntryGate: () => void;
   onExitZone: () => void;
   onExitedExitGate: () => void;
-  onPositionUpdate: (x: number, z: number, rot: number) => void;
 }
 
 export function ParkingScene({
@@ -212,18 +225,9 @@ export function ParkingScene({
   onExitedEntryGate,
   onExitZone,
   onExitedExitGate,
-  onPositionUpdate,
 }: ParkingSceneProps) {
-  // We need to pass current car position to follow camera
+  // Shared ref for follow camera (mutated by CarController)
   const carPosRef = useRef({ x: -4.5, z: 24, rot: Math.PI });
-
-  const handlePositionUpdate = useCallback(
-    (x: number, z: number, rot: number) => {
-      carPosRef.current = { x, z, rot };
-      onPositionUpdate(x, z, rot);
-    },
-    [onPositionUpdate]
-  );
 
   return (
     <Canvas
@@ -287,11 +291,11 @@ export function ParkingScene({
         onExitedEntryGate={onExitedEntryGate}
         onExitZone={onExitZone}
         onExitedExitGate={onExitedExitGate}
-        onPositionUpdate={handlePositionUpdate}
+        carPosRef={carPosRef}
       />
 
       {/* === FOLLOW CAMERA === */}
-      <FollowCamera targetPos={carPosRef.current} targetRot={carPosRef.current.rot} />
+      <FollowCamera carPosRef={carPosRef} />
     </Canvas>
   );
 }

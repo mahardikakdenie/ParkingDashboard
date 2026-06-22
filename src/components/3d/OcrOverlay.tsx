@@ -90,7 +90,7 @@ export function OcrOverlay({ state }: OcrOverlayProps) {
               {isEntry ? "SISTEM OCR – GATE MASUK" : "SISTEM OCR – GATE KELUAR"}
             </div>
             <div className="text-[10px] tracking-widest uppercase" style={{ color: accentColor }}>
-              PARKFLOW.AI · Optical Character Recognition
+              Udin Park · Optical Character Recognition
             </div>
           </div>
           {/* Animated indicator */}

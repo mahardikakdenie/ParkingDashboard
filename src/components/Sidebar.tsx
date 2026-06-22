@@ -40,7 +40,7 @@ export function Sidebar() {
               <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
                 <div className="w-4 h-4 border-2 border-white rounded-sm"></div>
               </div>
-              <h1 className="text-xl font-bold tracking-tight text-white italic">PARKFLOW<span className="text-blue-400">.AI</span></h1>
+              <h1 className="text-xl font-bold tracking-tight text-white italic">Udin <span className="text-blue-400">Park</span></h1>
             </div>
             
             {/* Close Button on Mobile */}

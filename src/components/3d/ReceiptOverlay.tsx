@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { SimulationState } from "@/hooks/useParkingSimulation";
+import { QrCode } from "lucide-react";
 
 interface ReceiptOverlayProps {
   state: SimulationState;
@@ -23,6 +25,7 @@ function formatCurrency(amount: number) {
 
 export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps) {
   const isVisible = state.phase === "EXIT_PAYMENT";
+  const [selectedPayment, setSelectedPayment] = useState<"ewallet" | "qris" | null>(null);
 
   if (!isVisible) return null;
 
@@ -42,7 +45,7 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
 
       {/* Receipt Panel */}
       <div
-        className="relative z-10 w-[440px] rounded-2xl overflow-hidden"
+        className="relative z-10 w-[90%] max-w-[440px] max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
         style={{
           background: "linear-gradient(160deg, #0F172A 0%, #1a2744 100%)",
           border: "1px solid rgba(251,191,36,0.3)",
@@ -51,14 +54,14 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
       >
         {/* Header */}
         <div
-          className="px-6 py-5 text-center"
+          className="px-6 py-5 text-center flex-shrink-0"
           style={{
             background: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.05) 100%)",
             borderBottom: "1px solid rgba(251,191,36,0.2)",
           }}
         >
           <div className="text-[10px] uppercase tracking-[0.3em] text-amber-400/70 mb-1">
-            PARKFLOW.AI SYSTEM
+            UDIN PARK SYSTEM
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">Struk Parkir</h2>
           <div className="text-[11px] text-slate-400 mt-1">
@@ -67,7 +70,7 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
         </div>
 
         {/* Receipt Body */}
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {/* Plate */}
           <div className="text-center">
             <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-2">Nomor Kendaraan</div>
@@ -158,34 +161,88 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
             </span>
           </div>
 
+          {/* Payment Selection UI */}
+          <div className="space-y-2 pt-1">
+            <div className="text-[9px] text-slate-500 uppercase tracking-widest text-center">
+              Pilih Metode Pembayaran
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedPayment("ewallet")}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
+                  selectedPayment === "ewallet"
+                    ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                    : "bg-slate-800/40 border-slate-750/60 text-slate-400 hover:bg-slate-800/80 hover:border-slate-650"
+                }`}
+              >
+                <span className="text-lg mb-1">📱</span>
+                <span className="text-xs font-bold uppercase tracking-wider">E-Wallet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPayment("qris")}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
+                  selectedPayment === "qris"
+                    ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+                    : "bg-slate-800/40 border-slate-750/60 text-slate-400 hover:bg-slate-800/80 hover:border-slate-650"
+                }`}
+              >
+                <span className="text-lg mb-1">📸</span>
+                <span className="text-xs font-bold uppercase tracking-wider">QRCODE QRIS</span>
+              </button>
+            </div>
+
+            {/* Dummy QRIS QR Code display */}
+            {selectedPayment === "qris" && (
+              <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-slate-200 mt-3 transition-all duration-300">
+                <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100 flex items-center justify-center">
+                  <QrCode className="w-36 h-36 text-slate-900" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-800 mt-2 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  QRIS DUMMY ACTIVE
+                </div>
+                <div className="text-[9px] text-slate-500 mt-0.5">
+                  Silakan scan untuk simulasi pembayaran
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Payment method note */}
-          <div className="text-center text-[10px] text-slate-500">
-            Pembayaran otomatis via RFID E-Money · Terima kasih
+          <div className="text-center text-[10px] text-slate-500 pb-2">
+            Terima kasih atas kunjungan Anda
           </div>
         </div>
 
         {/* Pay Button */}
         <div
-          className="px-6 pb-6"
+          className="px-6 pb-6 pt-4 flex-shrink-0"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <button
             onClick={onConfirmPayment}
-            className="w-full py-4 rounded-xl text-sm font-bold uppercase tracking-widest text-black transition-all duration-200 active:scale-95"
+            disabled={!selectedPayment}
+            className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-widest text-black transition-all duration-200 active:scale-95 ${
+              !selectedPayment ? "opacity-50 cursor-not-allowed bg-slate-600 text-slate-400" : ""
+            }`}
             style={{
-              background: "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)",
-              boxShadow: "0 4px 24px rgba(251,191,36,0.4)",
+              background: selectedPayment ? "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" : "#475569",
+              boxShadow: selectedPayment ? "0 4px 24px rgba(251,191,36,0.4)" : "none",
             }}
             onMouseEnter={(e) => {
+              if (!selectedPayment) return;
               e.currentTarget.style.boxShadow = "0 4px 36px rgba(251,191,36,0.6)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
+              if (!selectedPayment) return;
               e.currentTarget.style.boxShadow = "0 4px 24px rgba(251,191,36,0.4)";
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            💳 Bayar & Buka Gate Keluar
+            💳 {selectedPayment ? `Bayar dengan ${selectedPayment === "qris" ? "QRIS" : "E-Wallet"}` : "Pilih Pembayaran"}
           </button>
         </div>
       </div>

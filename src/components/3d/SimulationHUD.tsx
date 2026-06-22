@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { SimulationState, SimulationPhase } from "@/hooks/useParkingSimulation";
 
 interface SimulationHUDProps {
   state: SimulationState;
   onReset: () => void;
-  carPosition: { x: number; z: number };
-  carRotation: number;
 }
 
 const phaseLabels: Record<SimulationPhase, string> = {
@@ -64,18 +62,32 @@ function ElapsedTimer({ startTime }: { startTime: Date | null }) {
 }
 
 // Minimap: top-down 2D minimap
-function Minimap({
-  carPos,
-  carRot,
-}: {
-  carPos: { x: number; z: number };
-  carRot: number;
-}) {
+function Minimap() {
   const SIZE = 120;
   const WORLD = 36; // world radius
   const scale = SIZE / (WORLD * 2);
-  const cx = SIZE / 2 + carPos.x * scale;
-  const cy = SIZE / 2 + carPos.z * scale;
+
+  const dotRef = useRef<HTMLDivElement>(null);
+
+  // Initial position: x = -4.5, z = 24
+  const initialCx = SIZE / 2 + (-4.5) * scale;
+  const initialCy = SIZE / 2 + 24 * scale;
+
+  useEffect(() => {
+    const handleCarMoved = (e: Event) => {
+      const { x, z, rot } = (e as CustomEvent).detail;
+      if (dotRef.current) {
+        const cx = SIZE / 2 + x * scale;
+        const cy = SIZE / 2 + z * scale;
+        dotRef.current.style.left = `${cx - 6}px`;
+        dotRef.current.style.top = `${cy - 8}px`;
+        dotRef.current.style.transform = `rotate(${rot}rad)`;
+      }
+    };
+
+    window.addEventListener("car-moved", handleCarMoved);
+    return () => window.removeEventListener("car-moved", handleCarMoved);
+  }, [scale]);
 
   // Entry gate at ~(-4.5, 20), exit gate at ~(8.5, 20) in world space
   const entryGateX = SIZE / 2 + (-4.5) * scale;
@@ -137,13 +149,14 @@ function Minimap({
       />
       {/* Car dot */}
       <div
+        ref={dotRef}
         className="absolute w-3 h-4 rounded-sm"
         style={{
-          left: cx - 6,
-          top: cy - 8,
+          left: initialCx - 6,
+          top: initialCy - 8,
           background: "#DC2626",
           boxShadow: "0 0 8px rgba(220,38,38,0.8)",
-          transform: `rotate(${carRot}rad)`,
+          transform: `rotate(${Math.PI}rad)`,
           transformOrigin: "center",
           border: "1px solid #FCA5A5",
         }}
@@ -167,7 +180,7 @@ function Minimap({
   );
 }
 
-export function SimulationHUD({ state, onReset, carPosition, carRotation }: SimulationHUDProps) {
+export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
   const phaseColor = phaseColors[state.phase];
   const phaseLabel = phaseLabels[state.phase];
   const isCompleted = state.phase === "COMPLETED";
@@ -196,7 +209,7 @@ export function SimulationHUD({ state, onReset, carPosition, carRotation }: Simu
           </Link>
           <div>
             <div className="text-white font-bold text-sm tracking-wide">3D PARKING DEMO</div>
-            <div className="text-[9px] text-slate-500 uppercase tracking-widest">PARKFLOW.AI · Simulation</div>
+            <div className="text-[9px] text-slate-500 uppercase tracking-widest">Udin Park · Simulation</div>
           </div>
         </div>
 
@@ -289,7 +302,7 @@ export function SimulationHUD({ state, onReset, carPosition, carRotation }: Simu
       >
         {/* Minimap */}
         <div className="pointer-events-none">
-          <Minimap carPos={carPosition} carRot={carRotation} />
+          <Minimap />
         </div>
 
         {/* Controls Guide */}
