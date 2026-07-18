@@ -1,14 +1,13 @@
 import { MetricCard } from "@/components/MetricCard";
 import { RevenueChart } from "@/components/RevenueChart";
-import { CameraStream } from "@/components/CameraStream";
-import { Car, DollarSign, Clock, AlertTriangle } from "lucide-react";
+import { Car, DollarSign, Clock, AlertTriangle, Building2, Users } from "lucide-react";
 
-// Standardizing nice parking-related unsplash images
-const cctvCameras = [
-  { id: "CAM-01", name: "Main Entrance", location: "Gate A", status: "recording" as const, imageUrl: "https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=2067&auto=format&fit=crop" },
-  { id: "CAM-02", name: "Exit Ramp", location: "Gate B", status: "online" as const, imageUrl: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?q=80&w=1974&auto=format&fit=crop" },
-  { id: "CAM-03", name: "Zone C Basement", location: "Level B1", status: "recording" as const, imageUrl: "https://images.unsplash.com/photo-1621503437508-3ab9eb329aee?q=80&w=2070&auto=format&fit=crop" },
-  { id: "CAM-04", name: "VIP Parking", location: "Zone A", status: "offline" as const, imageUrl: "" },
+// Mock data for Company Partners Stats
+const partnerStats = [
+  { id: "PTN-01", name: "TechCorp Inc.", vehiclesToday: 45, revenue: "Rp 2,5M", status: "active", trend: "+5%" },
+  { id: "PTN-02", name: "Global Logistics", vehiclesToday: 120, revenue: "Rp 8,2M", status: "active", trend: "+12%" },
+  { id: "PTN-03", name: "City Mall Center", vehiclesToday: 350, revenue: "Rp 15,1M", status: "active", trend: "-2%" },
+  { id: "PTN-04", name: "StartUp Hub", vehiclesToday: 12, revenue: "Rp 450K", status: "warning", trend: "-15%" },
 ];
 
 export default function Dashboard() {
@@ -87,18 +86,48 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-2">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Live CCTV Feeds</h2>
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Building2 className="w-4 h-4 text-slate-400" />
+            <h2 className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Company Partners Overview</h2>
+          </div>
           <div className="flex items-center space-x-1.5">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-medium text-slate-500">3 Online, 1 Offline</span>
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[10px] font-medium text-slate-500">4 Active Partners</span>
           </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {cctvCameras.map((cam) => (
-            <CameraStream key={cam.id} {...cam} />
+          {partnerStats.map((partner) => (
+            <div key={partner.id} className="bg-slate-900 rounded-lg border border-slate-800 p-4 hover:border-slate-700 transition-colors flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-white truncate pr-2">{partner.name}</span>
+                <span className={`text-[8px] px-1.5 py-0.5 border rounded uppercase ${partner.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>
+                  {partner.status}
+                </span>
+              </div>
+              
+              <div className="space-y-3 mt-auto">
+                <div>
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Vehicles Entered</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono text-slate-200">{partner.vehiclesToday}</span>
+                    <Users className="w-3 h-3 text-slate-600" />
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Revenue Generated</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-mono text-emerald-400">{partner.revenue}</span>
+                    <div className={`flex items-center text-[9px] font-medium ${partner.trend.startsWith('+') ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {partner.trend}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>
