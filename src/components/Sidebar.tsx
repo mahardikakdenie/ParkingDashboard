@@ -1,21 +1,43 @@
 "use client";
 
-import { Video, ScanText, LogIn, LogOut, X, Gamepad2 } from "lucide-react";
+import { useState } from "react";
+import { Video, ScanText, LogIn, LogOut, X, Gamepad2, ChevronDown, ChevronRight, Box } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useParking } from "@/lib/ParkingContext";
 
-const navItems = [
+type NavItem = {
+  icon: any;
+  label: string;
+  href?: string;
+  children?: { label: string; href: string }[];
+};
+
+const navItems: NavItem[] = [
   { icon: Video, label: "Dashboard", href: "/" },
   { icon: ScanText, label: "OCR Scanner", href: "/ocr" },
-  { icon: LogIn, label: "Gate In (Entry)", href: "/gate/in" },
-  { icon: LogOut, label: "Gate Out (Exit)", href: "/gate/out" },
+  { 
+    icon: Box, 
+    label: "Gate Management", 
+    children: [
+      { label: "Gate In (Entry)", href: "/gate/in" },
+      { label: "Gate Out (Exit)", href: "/gate/out" },
+    ]
+  },
   { icon: Gamepad2, label: "3D Parking Demo", href: "/demo" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useParking();
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+
+  const toggleMenu = (label: string) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [label]: !prev[label]
+    }));
+  };
 
   return (
     <>
@@ -56,20 +78,72 @@ export function Sidebar() {
             <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2 px-3">Management</div>
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              const hasChildren = item.children && item.children.length > 0;
+              const isExpanded = expandedMenus[item.label];
+              
+              // Check if any child is active to highlight parent
+              const isChildActive = item.children?.some(child => pathname === child.href);
+              const isActive = pathname === item.href || isChildActive;
+
               return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2 transition-colors ${isActive
-                    ? "bg-blue-600/10 text-blue-400 rounded-md border border-blue-500/20"
-                    : "text-slate-400 hover:bg-slate-800 rounded-md"
-                    }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
+                <div key={item.label} className="mb-1">
+                  {hasChildren ? (
+                    <button
+                      onClick={() => toggleMenu(item.label)}
+                      className={`w-full flex items-center justify-between px-3 py-2 transition-colors ${isActive
+                        ? "bg-blue-600/10 text-blue-400 rounded-md border border-blue-500/20"
+                        : "text-slate-400 hover:bg-slate-800 rounded-md"
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </div>
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+                  ) : (
+                    <Link
+                      href={item.href!}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2 transition-colors ${isActive
+                        ? "bg-blue-600/10 text-blue-400 rounded-md border border-blue-500/20"
+                        : "text-slate-400 hover:bg-slate-800 rounded-md"
+                        }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Link>
+                  )}
+                  
+                  {/* Children Render with Tree Design */}
+                  {hasChildren && isExpanded && (
+                    <div className="mt-1 relative flex flex-col space-y-1 ml-5 pl-4">
+                      {/* Vertical Tree Line */}
+                      <div className="absolute left-0 top-0 bottom-4 w-0.5 bg-slate-700/50 rounded-full"></div>
+                      
+                      {item.children!.map((child) => {
+                        const isChildCurrent = pathname === child.href;
+                        return (
+                          <div key={child.label} className="relative">
+                            {/* Horizontal Tree Branch */}
+                            <div className="absolute -left-4 top-1/2 w-4 h-0.5 bg-slate-700/50 rounded-full -translate-y-1/2"></div>
+                            
+                            <Link
+                              href={child.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`block px-3 py-2 text-sm transition-colors rounded-md ${isChildCurrent
+                                ? "text-blue-400 bg-blue-600/10 font-medium"
+                                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                              }`}
+                            >
+                              {child.label}
+                            </Link>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
