@@ -287,7 +287,7 @@ export default function GateInPage() {
             </div>
 
             {/* Simulated Hardware Result Preview */}
-            <div className="bg-[#1E293B] border border-slate-700 rounded-lg p-5 flex flex-col justify-between min-h-[300px]">
+            <div className="bg-[#1E293B] border border-slate-700 rounded-lg p-5 flex flex-col justify-between min-h-75">
               <div>
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Simulasi Output Hardware</h2>
                 
@@ -304,9 +304,9 @@ export default function GateInPage() {
 
                     {activeSession.method === "TICKET" ? (
                       /* Ticket print rendering */
-                      <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[10px] shadow-lg max-w-[220px] mx-auto text-center flex flex-col items-center">
+                      <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[10px] shadow-lg max-w-55 mx-auto text-center flex flex-col items-center">
                         <div className="font-bold border-b border-dashed border-slate-900 pb-1.5 w-full uppercase tracking-wider text-xs">
-                          TICKET Udin Park
+                          TICKET NexGate
                         </div>
                         <div className="py-3 flex flex-col items-center w-full">
                           {/* Simulated QR Code using style */}
@@ -328,7 +328,7 @@ export default function GateInPage() {
                       </div>
                     ) : (
                       /* E-money Reader Screen rendering */
-                      <div className="bg-[#1E293B] border border-blue-500/20 rounded p-4 font-mono text-center max-w-[220px] mx-auto text-blue-400 bg-slate-900/60 shadow-lg">
+                      <div className="bg-slate-900/60 border border-blue-500/20 rounded p-4 font-mono text-center max-w-55 mx-auto text-blue-400 shadow-lg">
                         <div className="text-[9px] text-slate-500 uppercase tracking-widest">Reader E-Money</div>
                         <CreditCard className="w-10 h-10 mx-auto my-3 text-blue-500" />
                         <div className="text-xs font-bold">{activeSession.identifier}</div>

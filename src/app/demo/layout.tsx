@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "3D Parking Demo – Udin Park",
+  title: "3D Parking Demo – NexGate",
   description: "Simulasi interaktif parkir 3D dengan kontrol keyboard untuk Daihatsu Ayla B 8789 DI.",
 };
 

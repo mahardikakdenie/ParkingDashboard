@@ -209,7 +209,7 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
           </Link>
           <div>
             <div className="text-white font-bold text-sm tracking-wide">3D PARKING DEMO</div>
-            <div className="text-[9px] text-slate-500 uppercase tracking-widest">Udin Park · Simulation</div>
+            <div className="text-[9px] text-slate-500 uppercase tracking-widest">NexGate · Simulation</div>
           </div>
         </div>
 

@@ -45,7 +45,7 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
 
       {/* Receipt Panel */}
       <div
-        className="relative z-10 w-[90%] max-w-[440px] max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
+        className="relative z-10 w-[90%] max-w-110 max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
         style={{
           background: "linear-gradient(160deg, #0F172A 0%, #1a2744 100%)",
           border: "1px solid rgba(251,191,36,0.3)",
@@ -54,14 +54,14 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
       >
         {/* Header */}
         <div
-          className="px-6 py-5 text-center flex-shrink-0"
+          className="px-6 py-5 text-center shrink-0"
           style={{
             background: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.05) 100%)",
             borderBottom: "1px solid rgba(251,191,36,0.2)",
           }}
         >
           <div className="text-[10px] uppercase tracking-[0.3em] text-amber-400/70 mb-1">
-            UDIN PARK SYSTEM
+            NEXGATE SYSTEM
           </div>
           <h2 className="text-xl font-bold text-white tracking-tight">Struk Parkir</h2>
           <div className="text-[11px] text-slate-400 mt-1">
@@ -218,7 +218,7 @@ export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps)
 
         {/* Pay Button */}
         <div
-          className="px-6 pb-6 pt-4 flex-shrink-0"
+          className="px-6 pb-6 pt-4 shrink-0"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <button

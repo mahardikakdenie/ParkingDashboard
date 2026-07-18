@@ -62,7 +62,7 @@ export function OcrOverlay({ state }: OcrOverlayProps) {
 
       {/* OCR Panel */}
       <div
-        className="relative z-10 w-[420px] rounded-2xl overflow-hidden"
+        className="relative z-10 w-105 rounded-2xl overflow-hidden"
         style={{
           background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
           border: `1px solid ${accentColor}40`,
@@ -90,7 +90,7 @@ export function OcrOverlay({ state }: OcrOverlayProps) {
               {isEntry ? "SISTEM OCR – GATE MASUK" : "SISTEM OCR – GATE KELUAR"}
             </div>
             <div className="text-[10px] tracking-widest uppercase" style={{ color: accentColor }}>
-              Udin Park · Optical Character Recognition
+              NexGate · Optical Character Recognition
             </div>
           </div>
           {/* Animated indicator */}

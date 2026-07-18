@@ -224,7 +224,7 @@ export default function GateOutPage() {
                     {sessions.filter(s => s.status === "ACTIVE").length === 0 ? (
                       <p className="italic text-slate-500">Tidak ada kendaraan aktif saat ini.</p>
                     ) : (
-                      <div className="max-h-[100px] overflow-y-auto space-y-1 pr-1">
+                      <div className="max-h-25 overflow-y-auto space-y-1 pr-1">
                         {sessions.filter(s => s.status === "ACTIVE").map((s) => (
                           <div 
                             key={s.id} 
@@ -291,7 +291,7 @@ export default function GateOutPage() {
                         </button>
                       ) : (
                         <div className="space-y-3">
-                          <div className="bg-white p-3 rounded-lg max-w-[150px] mx-auto border border-slate-350 flex flex-col items-center">
+                          <div className="bg-white p-3 rounded-lg max-w-37.5 mx-auto border border-slate-350 flex flex-col items-center">
                             <QrCode className="w-32 h-32 text-slate-900" />
                             <div className="text-[8px] text-slate-500 font-sans mt-1.5 font-bold tracking-widest uppercase">QRIS STANDARDIZED</div>
                           </div>
@@ -335,14 +335,14 @@ export default function GateOutPage() {
             </div>
 
             {/* Receipt / Invoice Preview simulation */}
-            <div className="bg-[#1E293B] border border-slate-700 rounded-lg p-5 flex flex-col justify-between min-h-[300px]">
+            <div className="bg-[#1E293B] border border-slate-700 rounded-lg p-5 flex flex-col justify-between min-h-75">
               <div>
                 <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-4">Simulasi Struk Parkir</h2>
                 
                 {activeSession && paymentStep === "SUCCESS" ? (
-                  <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[9px] shadow-lg max-w-[220px] mx-auto text-left space-y-2">
+                  <div className="bg-white text-slate-900 border border-slate-300 rounded p-4 font-mono text-[9px] shadow-lg max-w-55 mx-auto text-left space-y-2">
                     <div className="text-center font-bold border-b border-dashed border-slate-900 pb-1.5 w-full uppercase tracking-wider text-xs">
-                      INVOICE Udin Park
+                      INVOICE NexGate
                     </div>
                     <div className="space-y-1 pt-1.5">
                       <div>PLAT: <span className="font-bold">{activeSession.plateNumber}</span></div>
