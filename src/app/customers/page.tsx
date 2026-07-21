@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Search, RefreshCw, UserCheck, Download, Eye, Loader2 } from "lucide-react";
 import { customersService } from "@/services/customers.service";
 import { CustomerItem, PaginationMeta, DetailCustomerResponse } from "@/types/api";
+import { TableEmptyState } from "@/components/TableEmptyState";
 
 export default function CustomersPage() {
   const [items, setItems] = useState<CustomerItem[]>([]);
@@ -105,24 +106,35 @@ export default function CustomersPage() {
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" /> Loading...
                   </td>
                 </tr>
-              ) : items.map((c) => (
-                <tr key={c.id} className="hover:bg-slate-800/30">
-                  <td className="p-3 font-mono text-emerald-400">{c.card_number}</td>
-                  <td className="p-3 font-semibold text-white">{c.name}</td>
-                  <td className="p-3 text-slate-400">{c.phone}</td>
-                  <td className="p-3 font-mono font-bold text-white">Rp {c.balance.toLocaleString()}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${c.status === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                      {c.status_text || (c.status === 1 ? "Active" : "Blocked")}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleViewDetail(c.id)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              ) : items.length === 0 ? (
+                <TableEmptyState
+                  colSpan={6}
+                  icon={UserCheck}
+                  title="Belum Ada Customer"
+                  description="Belum ada data pelanggan yang terdaftar dalam sistem."
+                  searchTerm={search}
+                  onClearSearch={() => setSearch("")}
+                />
+              ) : (
+                items.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-800/30">
+                    <td className="p-3 font-mono text-emerald-400">{c.card_number}</td>
+                    <td className="p-3 font-semibold text-white">{c.name}</td>
+                    <td className="p-3 text-slate-400">{c.phone}</td>
+                    <td className="p-3 font-mono font-bold text-white">Rp {c.balance.toLocaleString()}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${c.status === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+                        {c.status_text || (c.status === 1 ? "Active" : "Blocked")}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button onClick={() => handleViewDetail(c.id)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
