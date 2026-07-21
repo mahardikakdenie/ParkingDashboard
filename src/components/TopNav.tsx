@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Search, Menu } from "lucide-react";
+import { Search, Menu } from "lucide-react";
 import { useParking } from "@/lib/ParkingContext";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
 
 export function TopNav() {
   const { sidebarOpen, setSidebarOpen } = useParking();
@@ -18,11 +19,11 @@ export function TopNav() {
         <div className="flex flex-col">
           <span className="text-[10px] text-slate-500 uppercase font-bold">System Status</span>
           <span className="text-xs flex items-center gap-1.5 text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Fully Operational
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Fully Operational
           </span>
         </div>
         <div className="w-px h-8 bg-slate-700"></div>
-        <div className="flex flex-col hidden sm:flex">
+        <div className="hidden sm:flex flex-col">
           <span className="text-[10px] text-slate-500 uppercase font-bold">Active Session</span>
           <span className="text-xs text-white">12h 42m 11s</span>
         </div>
@@ -39,10 +40,8 @@ export function TopNav() {
           />
         </div>
         
-        <button className="relative text-slate-400 hover:text-white transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
-        </button>
+        {/* Komponen Dropdown Notifikasi Modern */}
+        <NotificationDropdown />
       </div>
     </header>
   );

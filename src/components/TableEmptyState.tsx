@@ -39,7 +39,7 @@ export const TableEmptyState: React.FC<TableEmptyStateProps> = ({
         <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
           {/* Glowing Premium Icon Wrapper */}
           <div className="relative mb-4 group">
-            <div className="absolute -inset-2 bg-gradient-to-r from-blue-600/20 via-indigo-500/20 to-purple-600/20 rounded-3xl blur-lg opacity-70 group-hover:opacity-100 transition duration-500 animate-pulse" />
+            <div className="absolute -inset-2 bg-linear-to-r from-blue-600/20 via-indigo-500/20 to-purple-600/20 rounded-3xl blur-lg opacity-70 group-hover:opacity-100 transition duration-500 animate-pulse" />
             <div className="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/90 border border-slate-700/60 shadow-xl backdrop-blur-md group-hover:border-slate-600 transition-all duration-300">
               <FinalIcon className="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
             </div>
