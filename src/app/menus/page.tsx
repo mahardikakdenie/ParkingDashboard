@@ -5,6 +5,7 @@ import { RefreshCw, Menu as MenuIcon, Edit, Loader2 } from "lucide-react";
 import { menusService } from "@/services/menus.service";
 import { menuGroupsService } from "@/services/menu-groups.service";
 import { MenuResponse, MenuGroupOptionsResponse } from "@/types/api";
+import { TableEmptyState } from "@/components/TableEmptyState";
 
 export default function MenusPage() {
   const [menus, setMenus] = useState<MenuResponse[]>([]);
@@ -98,20 +99,29 @@ export default function MenusPage() {
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-cyan-500 mb-2" /> Loading menus...
                   </td>
                 </tr>
-              ) : menus.map((menu) => (
-                <tr key={menu.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="p-3 font-semibold text-white">{menu.name}</td>
-                  <td className="p-3 font-mono text-cyan-400">{menu.path}</td>
-                  <td className="p-3 text-slate-400">{menu.icon || "-"}</td>
-                  <td className="p-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">{menu.level}</span></td>
-                  <td className="p-3 font-mono">{menu.sort}</td>
-                  <td className="p-3 text-right">
-                    <button onClick={() => handleEdit(menu)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              ) : menus.length === 0 ? (
+                <TableEmptyState
+                  colSpan={6}
+                  icon={MenuIcon}
+                  title="Belum Ada Menu"
+                  description="Belum ada item menu yang terkonfigurasi dalam sistem."
+                />
+              ) : (
+                menus.map((menu) => (
+                  <tr key={menu.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="p-3 font-semibold text-white">{menu.name}</td>
+                    <td className="p-3 font-mono text-cyan-400">{menu.path}</td>
+                    <td className="p-3 text-slate-400">{menu.icon || "-"}</td>
+                    <td className="p-3"><span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px]">{menu.level}</span></td>
+                    <td className="p-3 font-mono">{menu.sort}</td>
+                    <td className="p-3 text-right">
+                      <button onClick={() => handleEdit(menu)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
