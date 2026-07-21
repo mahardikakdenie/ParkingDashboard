@@ -12,4 +12,30 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Premium Ultra-thin Glassmorphic Scrollbar */
+  .custom-sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 9999px;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 9999px;
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+
+  .custom-sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+  }
 }
