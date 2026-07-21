@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Plus, Search, RefreshCw, FolderTree, Edit, Loader2 } from "lucide-react";
 import { menuGroupsService } from "@/services/menu-groups.service";
 import { MenuGroupItem, PaginationMeta } from "@/types/api";
+import { TableEmptyState } from "@/components/TableEmptyState";
 
 export default function MenuGroupsPage() {
   const [items, setItems] = useState<MenuGroupItem[]>([]);
@@ -113,9 +114,16 @@ export default function MenuGroupsPage() {
                   </td>
                 </tr>
               ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500">No menu groups found</td>
-                </tr>
+                <TableEmptyState
+                  colSpan={4}
+                  icon={FolderTree}
+                  title="Belum Ada Menu Group"
+                  description="Silakan tambahkan kelompok menu baru."
+                  searchTerm={search}
+                  onClearSearch={() => setSearch("")}
+                  actionLabel="Tambah Group"
+                  onAction={() => handleOpenModal()}
+                />
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
