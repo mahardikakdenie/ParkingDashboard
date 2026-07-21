@@ -1,23 +1,20 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Search, RefreshCw, ShieldCheck, Edit, Loader2 } from "lucide-react";
 import { rolesService } from "@/services/roles.service";
-import { RoleItem, PaginationMeta, AssignmentRoleResponse } from "@/types/api";
+import { RoleItem, PaginationMeta } from "@/types/api";
 import { TableEmptyState } from "@/components/TableEmptyState";
 
 export default function RolesPage() {
+  const router = useRouter();
   const [items, setItems] = useState<RoleItem[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ page: 1, total_data: 0, total_pages: 1, total_per_page: 10 });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-
-  const [assignmentData, setAssignmentData] = useState<AssignmentRoleResponse | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<RoleItem | null>(null);
-  const [formData, setFormData] = useState({ name: "", description: "", menus: [] as string[], resource_permissions: [] as string[], status: 1 });
-  const [submitting, setSubmitting] = useState(false);
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
@@ -36,51 +33,9 @@ export default function RolesPage() {
     fetchRoles();
   }, [fetchRoles]);
 
-  const handleOpenModal = async (item?: RoleItem) => {
-    try {
-      const assignment = await rolesService.getAssignment();
-      setAssignmentData(assignment);
-
-      if (item) {
-        const detail = await rolesService.getDetail(item.id);
-        setEditingItem(item);
-        setFormData({
-          name: detail.name,
-          description: detail.description,
-          menus: detail.assigned_menus || [],
-          resource_permissions: detail.assigned_resource_permissions || [],
-          status: detail.status,
-        });
-      } else {
-        setEditingItem(null);
-        setFormData({ name: "", description: "", menus: [], resource_permissions: [], status: 1 });
-      }
-      setIsModalOpen(true);
-    } catch (err) {
-      console.error("Failed to prepare modal", err);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      if (editingItem) {
-        await rolesService.update(editingItem.id, formData);
-      } else {
-        await rolesService.create(formData);
-      }
-      setIsModalOpen(false);
-      fetchRoles();
-    } catch (err) {
-      console.error("Save role failed", err);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
+      {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-xl">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -93,12 +48,13 @@ export default function RolesPage() {
           <button onClick={fetchRoles} className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-2">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
-          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg transition-colors flex items-center gap-2">
+          <Link href="/roles/create" className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg transition-colors flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Role
-          </button>
+          </Link>
         </div>
       </div>
 
+      {/* Main Table Container */}
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl space-y-4">
         <div className="relative max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -137,7 +93,7 @@ export default function RolesPage() {
                   searchTerm={search}
                   onClearSearch={() => setSearch("")}
                   actionLabel="Tambah Role"
-                  onAction={() => handleOpenModal()}
+                  onAction={() => router.push("/roles/create")}
                 />
               ) : (
                 items.map((item) => (
@@ -150,9 +106,9 @@ export default function RolesPage() {
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <button onClick={() => handleOpenModal(item)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
+                      <Link href={`/roles/edit/${item.id}`} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors inline-block" title="Edit Role Permissions">
                         <Edit className="w-3.5 h-3.5" />
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -161,68 +117,6 @@ export default function RolesPage() {
           </table>
         </div>
       </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-white">{editingItem ? "Edit Role Permissions" : "Add New Role"}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Role Name</label>
-                <input
-                  required
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">Description</label>
-                <input
-                  type="text"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Menus Checkboxes */}
-              {assignmentData?.menus && (
-                <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-2">Assigned Menus</label>
-                  <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 border border-slate-800 rounded-xl max-h-40 overflow-y-auto">
-                    {assignmentData.menus.map((m) => (
-                      <label key={m.id} className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.menus.includes(m.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({ ...formData, menus: [...formData.menus, m.id] });
-                            } else {
-                              setFormData({ ...formData, menus: formData.menus.filter((id) => id !== m.id) });
-                            }
-                          }}
-                          className="rounded border-slate-800 text-emerald-600 bg-slate-950"
-                        />
-                        {m.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold disabled:opacity-50">
-                  {submitting ? "Saving..." : "Save Role"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
