@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Plus, Search, RefreshCw, Layers, Edit, Loader2 } from "lucide-react";
 import { applicationsService } from "@/services/applications.service";
 import { ApplicationItem, PaginationMeta } from "@/types/api";
+import { TableEmptyState } from "@/components/TableEmptyState";
 
 export default function ApplicationsPage() {
   const [items, setItems] = useState<ApplicationItem[]>([]);
@@ -120,9 +121,16 @@ export default function ApplicationsPage() {
                   </td>
                 </tr>
               ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">No applications found</td>
-                </tr>
+                <TableEmptyState
+                  colSpan={5}
+                  icon={Layers}
+                  title="Belum Ada Aplikasi"
+                  description="Sistem belum memiliki aplikasi terdaftar."
+                  searchTerm={search}
+                  onClearSearch={() => setSearch("")}
+                  actionLabel="Tambah Aplikasi"
+                  onAction={() => handleOpenModal()}
+                />
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
