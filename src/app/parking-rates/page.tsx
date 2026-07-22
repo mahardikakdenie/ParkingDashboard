@@ -14,9 +14,18 @@ export default function ParkingRatesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ParkingRateItem | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    vehicle_type_id: string;
+    rate_type: "flat" | "hourly" | "progressive";
+    amount: number;
+    additional_amount: number;
+    grace_period_minutes: number;
+    max_daily_amount: number;
+    effective_date: string;
+    status: number;
+  }>({
     vehicle_type_id: "",
-    rate_type: "FLAT",
+    rate_type: "flat",
     amount: 0,
     additional_amount: 0,
     grace_period_minutes: 15,
@@ -51,7 +60,7 @@ export default function ParkingRatesPage() {
       setEditingItem(item);
       setFormData({
         vehicle_type_id: "",
-        rate_type: item.rate_type,
+        rate_type: (item.rate_type?.toLowerCase() as "flat" | "hourly" | "progressive") || "flat",
         amount: item.amount,
         additional_amount: item.additional_amount || 0,
         grace_period_minutes: item.grace_period_minutes || 15,
@@ -63,7 +72,7 @@ export default function ParkingRatesPage() {
       setEditingItem(null);
       setFormData({
         vehicle_type_id: vehicleTypes[0]?.id || "",
-        rate_type: "FLAT",
+        rate_type: "flat",
         amount: 5000,
         additional_amount: 2000,
         grace_period_minutes: 15,
@@ -102,7 +111,7 @@ export default function ParkingRatesPage() {
     {
       key: "rate_type",
       header: "Rate Model",
-      render: (r) => <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded font-mono text-[10px] border border-indigo-500/20">{r.rate_type}</span>,
+      render: (r) => <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded font-mono text-[10px] border border-indigo-500/20 uppercase">{r.rate_type}</span>,
     },
     {
       key: "amount",
@@ -186,10 +195,10 @@ export default function ParkingRatesPage() {
               )}
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Rate Type</label>
-                <select value={formData.rate_type} onChange={(e) => setFormData({ ...formData, rate_type: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
-                  <option value="FLAT">FLAT</option>
-                  <option value="HOURLY">HOURLY</option>
-                  <option value="PROGRESSIVE">PROGRESSIVE</option>
+                <select value={formData.rate_type} onChange={(e) => setFormData({ ...formData, rate_type: e.target.value as "flat" | "hourly" | "progressive" })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                  <option value="flat">FLAT</option>
+                  <option value="hourly">HOURLY</option>
+                  <option value="progressive">PROGRESSIVE</option>
                 </select>
               </div>
               <div>

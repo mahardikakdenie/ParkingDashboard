@@ -71,9 +71,11 @@ export interface CreateMenuGroupDto {
   sort?: number;
 }
 
+export type RateType = 'flat' | 'hourly' | 'progressive';
+
 export interface CreateParkingRateDto {
   vehicle_type_id: string;
-  rate_type: string;
+  rate_type: RateType;
   amount: number;
   additional_amount?: number;
   grace_period_minutes?: number;
@@ -168,7 +170,7 @@ export interface DetailMenuGroupResponse {
 export interface DetailParkingRateResponse {
   id: string;
   vehicle_type_id: string;
-  rate_type: string;
+  rate_type: RateType;
   amount: number;
   additional_amount: number;
   grace_period_minutes: number;
@@ -399,7 +401,7 @@ export interface PaginationMeta {
 export interface ParkingRateItem {
   id: string;
   vehicle_type_name: string;
-  rate_type: string;
+  rate_type: RateType;
   amount: number;
   additional_amount: number;
   grace_period_minutes: number;
@@ -536,7 +538,7 @@ export interface UpdateMenuGroupDto {
 
 export interface UpdateParkingRateDto {
   vehicle_type_id: string;
-  rate_type: string;
+  rate_type: RateType;
   amount: number;
   additional_amount?: number;
   grace_period_minutes?: number;
