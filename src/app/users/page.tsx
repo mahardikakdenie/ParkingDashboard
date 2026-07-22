@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Search, RefreshCw, Users, Download, Edit, Loader2 } from "lucide-react";
+import { Plus, RefreshCw, Users, Download, Edit } from "lucide-react";
 import { usersService } from "@/services/users.service";
 import { rolesService } from "@/services/roles.service";
 import { applicationsService } from "@/services/applications.service";
 import { UserItem, PaginationMeta, RoleOptionsResponse, OptionsApplicationResponse } from "@/types/api";
-import { TableEmptyState } from "@/components/TableEmptyState";
+import { DataTable, Column } from "@/components/DataTable";
 
 export default function UsersPage() {
   const [items, setItems] = useState<UserItem[]>([]);
@@ -120,6 +120,48 @@ export default function UsersPage() {
     }
   };
 
+  const columns: Column<UserItem>[] = [
+    {
+      key: "user",
+      header: "User",
+      render: (user) => (
+        <div>
+          <div className="font-semibold text-white">{user.name}</div>
+          <div className="text-[10px] text-slate-500 font-mono">@{user.id}</div>
+        </div>
+      ),
+    },
+    {
+      key: "contact",
+      header: "Contact",
+      render: (user) => (
+        <div>
+          <div>{user.email}</div>
+          <div className="text-slate-500">{user.phone}</div>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (user) => (
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.status === 1 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+          {user.status_text || (user.status === 1 ? "Active" : "Inactive")}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      align: "right",
+      render: (user) => (
+        <button onClick={() => handleOpenModal(user)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
+          <Edit className="w-3.5 h-3.5" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-xl">
@@ -137,80 +179,37 @@ export default function UsersPage() {
           <button onClick={fetchUsers} className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-2">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
-          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg transition-colors flex items-center gap-2">
+          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-colors flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add User
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl space-y-4">
-        <div className="relative max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search username, name, email..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-slate-950/50 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-800/50 text-slate-400 uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="p-3">User</th>
-                <th className="p-3">Contact</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" /> Loading...
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <TableEmptyState
-                  colSpan={4}
-                  icon={Users}
-                  title="Belum Ada User"
-                  description="Belum ada akun user terdaftar dalam sistem."
-                  searchTerm={search}
-                  onClearSearch={() => setSearch("")}
-                  actionLabel="Tambah User"
-                  onAction={() => handleOpenModal()}
-                />
-              ) : (
-                items.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="p-3">
-                      <div className="font-semibold text-white">{user.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">@{user.id}</div>
-                    </td>
-                    <td className="p-3">
-                      <div>{user.email}</div>
-                      <div className="text-slate-500">{user.phone}</div>
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${user.status === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                        {user.status_text || (user.status === 1 ? "Active" : "Inactive")}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <button onClick={() => handleOpenModal(user)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        accentColor="blue"
+        search={{
+          value: search,
+          onChange: (val) => { setSearch(val); setPage(1); },
+          placeholder: "Search username, name, email...",
+        }}
+        pagination={{
+          currentPage: meta.page,
+          totalPages: meta.total_pages,
+          totalItems: meta.total_data,
+          itemsPerPage: meta.total_per_page,
+          onPageChange: (p) => setPage(p),
+        }}
+        emptyState={{
+          icon: Users,
+          title: "Belum Ada User",
+          description: "Belum ada akun user terdaftar dalam sistem.",
+          actionLabel: "Tambah User",
+          onAction: () => handleOpenModal(),
+        }}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -240,8 +239,8 @@ export default function UsersPage() {
                 </div>
               )}
               <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-800 text-slate-300 text-xs">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save"}</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save"}</button>
               </div>
             </form>
           </div>

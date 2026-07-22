@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, RefreshCw, CircleDollarSign, Edit, Loader2 } from "lucide-react";
+import { Plus, RefreshCw, CircleDollarSign, Edit } from "lucide-react";
 import { parkingRatesService } from "@/services/parking-rates.service";
 import { vehicleTypesService } from "@/services/vehicle-types.service";
 import { ParkingRateItem, VehicleTypeOptionsResponse } from "@/types/api";
-import { TableEmptyState } from "@/components/TableEmptyState";
+import { DataTable, Column } from "@/components/DataTable";
 
 export default function ParkingRatesPage() {
   const [items, setItems] = useState<ParkingRateItem[]>([]);
@@ -93,6 +93,48 @@ export default function ParkingRatesPage() {
     }
   };
 
+  const columns: Column<ParkingRateItem>[] = [
+    {
+      key: "vehicle_type",
+      header: "Vehicle Category",
+      render: (r) => <span className="font-semibold text-white">{r.vehicle_type_name || "All Vehicles"}</span>,
+    },
+    {
+      key: "rate_type",
+      header: "Rate Model",
+      render: (r) => <span className="px-2 py-0.5 bg-slate-800 text-indigo-300 rounded font-mono text-[10px] border border-indigo-500/20">{r.rate_type}</span>,
+    },
+    {
+      key: "amount",
+      header: "Base Amount",
+      render: (r) => <span className="font-mono text-emerald-400 font-bold">Rp {r.amount.toLocaleString()}</span>,
+    },
+    {
+      key: "additional_amount",
+      header: "Hourly Rate",
+      render: (r) => <span className="font-mono text-slate-300">Rp {(r.additional_amount || 0).toLocaleString()}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (r) => (
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${r.status === 1 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+          {r.status === 1 ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      render: (r) => (
+        <button onClick={() => handleOpenModal(r)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
+          <Edit className="w-3.5 h-3.5" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-xl">
@@ -101,101 +143,66 @@ export default function ParkingRatesPage() {
             <CircleDollarSign className="w-6 h-6 text-emerald-400" />
             Parking Rates Setup
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Configure hourly, flat, and grace period tariffs per vehicle category.</p>
+          <p className="text-xs text-slate-400 mt-1">Configure vehicle tariff rules, hourly add-ons, and grace periods.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={fetchRates} className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center gap-2">
+          <button onClick={fetchRates} className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-2">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
-          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Rate Rule
+          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition-colors flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Add Tariff Rule
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-800/50 text-slate-400 uppercase text-[10px]">
-              <tr>
-                <th className="p-3">Vehicle Category</th>
-                <th className="p-3">Rate Type</th>
-                <th className="p-3">Base Amount</th>
-                <th className="p-3">Hourly Rate</th>
-                <th className="p-3">Grace Period</th>
-                <th className="p-3">Max Daily</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" /> Loading...
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <TableEmptyState
-                  colSpan={7}
-                  icon={CircleDollarSign}
-                  title="Belum Ada Tarif Parkir"
-                  description="Belum ada aturan tarif parkir yang dikonfigurasi."
-                  actionLabel="Tambah Tarif"
-                  onAction={() => handleOpenModal()}
-                />
-              ) : (
-                items.map((rate) => (
-                  <tr key={rate.id} className="hover:bg-slate-800/30">
-                    <td className="p-3 font-semibold text-white">{rate.vehicle_type_name}</td>
-                    <td className="p-3"><span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px]">{rate.rate_type}</span></td>
-                    <td className="p-3 font-mono font-bold text-emerald-400">Rp {rate.amount.toLocaleString()}</td>
-                    <td className="p-3 font-mono">Rp {rate.additional_amount.toLocaleString()}</td>
-                    <td className="p-3">{rate.grace_period_minutes} mins</td>
-                    <td className="p-3 font-mono text-slate-400">Rp {rate.max_daily_amount.toLocaleString()}</td>
-                    <td className="p-3 text-right">
-                      <button onClick={() => handleOpenModal(rate)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        accentColor="emerald"
+        emptyState={{
+          icon: CircleDollarSign,
+          title: "Belum Ada Tarif Parkir",
+          description: "Belum ada aturan tarif parkir yang dikonfigurasi.",
+          actionLabel: "Tambah Aturan Tarif",
+          onAction: () => handleOpenModal(),
+        }}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold text-white">{editingItem ? "Edit Rate Rule" : "Add Rate Rule"}</h2>
+            <h2 className="text-lg font-bold text-white">{editingItem ? "Edit Parking Rate" : "Add Parking Rate"}</h2>
             <form onSubmit={handleSubmit} className="space-y-3">
+              {!editingItem && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Vehicle Type</label>
+                  <select value={formData.vehicle_type_id} onChange={(e) => setFormData({ ...formData, vehicle_type_id: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    {vehicleTypes.map((vt) => (
+                      <option key={vt.id} value={vt.id}>{vt.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Vehicle Category</label>
-                <select
-                  value={formData.vehicle_type_id}
-                  onChange={(e) => setFormData({ ...formData, vehicle_type_id: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                >
-                  <option value="">-- Select Category --</option>
-                  {vehicleTypes.map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
+                <label className="text-xs text-slate-400 block mb-1">Rate Type</label>
+                <select value={formData.rate_type} onChange={(e) => setFormData({ ...formData, rate_type: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                  <option value="FLAT">FLAT</option>
+                  <option value="HOURLY">HOURLY</option>
+                  <option value="PROGRESSIVE">PROGRESSIVE</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Base Amount (Rp)</label>
-                  <input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">Hourly Rate (Rp)</label>
-                  <input type="number" value={formData.additional_amount} onChange={(e) => setFormData({ ...formData, additional_amount: parseFloat(e.target.value) || 0 })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none" />
-                </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Base Amount (Rp)</label>
+                <input required type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 block mb-1">Hourly/Additional Amount (Rp)</label>
+                <input required type="number" value={formData.additional_amount} onChange={(e) => setFormData({ ...formData, additional_amount: Number(e.target.value) })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" />
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save Rate"}</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save"}</button>
               </div>
             </form>
           </div>

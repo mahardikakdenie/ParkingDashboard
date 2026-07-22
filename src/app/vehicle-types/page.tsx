@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Plus, Search, RefreshCw, Car, Edit, Loader2 } from "lucide-react";
+import { Plus, RefreshCw, Car, Edit } from "lucide-react";
 import { vehicleTypesService } from "@/services/vehicle-types.service";
 import { VehicleTypeItem, PaginationMeta } from "@/types/api";
-import { TableEmptyState } from "@/components/TableEmptyState";
+import { DataTable, Column } from "@/components/DataTable";
 
 export default function VehicleTypesPage() {
   const [items, setItems] = useState<VehicleTypeItem[]>([]);
@@ -64,6 +64,38 @@ export default function VehicleTypesPage() {
     }
   };
 
+  const columns: Column<VehicleTypeItem>[] = [
+    {
+      key: "name",
+      header: "Category Name",
+      render: (item) => <span className="font-semibold text-white">{item.name}</span>,
+    },
+    {
+      key: "description",
+      header: "Description",
+      render: (item) => <span className="text-slate-400">{item.description || "-"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (item) => (
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${item.status === 1 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+          {item.status === 1 ? "Active" : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      render: (item) => (
+        <button onClick={() => handleOpenModal(item)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
+          <Edit className="w-3.5 h-3.5" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-xl">
@@ -78,74 +110,37 @@ export default function VehicleTypesPage() {
           <button onClick={fetchTypes} className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-2">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
-          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-lg transition-colors flex items-center gap-2">
+          <button onClick={() => handleOpenModal()} className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/20 transition-colors flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Vehicle Type
           </button>
         </div>
       </div>
 
-      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-xl space-y-4">
-        <div className="relative max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search category name..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full bg-slate-950/50 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-800/50 text-slate-400 uppercase tracking-wider text-[10px]">
-              <tr>
-                <th className="p-3">Category Name</th>
-                <th className="p-3">Description</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-cyan-500 mb-2" /> Loading...
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <TableEmptyState
-                  colSpan={4}
-                  icon={Car}
-                  title="Belum Ada Kategori Kendaraan"
-                  description="Belum ada jenis/kategori kendaraan terdaftar."
-                  searchTerm={search}
-                  onClearSearch={() => setSearch("")}
-                  actionLabel="Tambah Jenis"
-                  onAction={() => handleOpenModal()}
-                />
-              ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 font-medium">
-                    <td className="p-3 font-semibold text-white">{item.name}</td>
-                    <td className="p-3 text-slate-400">{item.description || "-"}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${item.status === 1 ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                        {item.status_text || (item.status === 1 ? "Active" : "Inactive")}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <button onClick={() => handleOpenModal(item)} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={columns}
+        data={items}
+        loading={loading}
+        accentColor="cyan"
+        search={{
+          value: search,
+          onChange: (val) => { setSearch(val); setPage(1); },
+          placeholder: "Search category name...",
+        }}
+        pagination={{
+          currentPage: meta.page,
+          totalPages: meta.total_pages,
+          totalItems: meta.total_data,
+          itemsPerPage: meta.total_per_page,
+          onPageChange: (p) => setPage(p),
+        }}
+        emptyState={{
+          icon: Car,
+          title: "Belum Ada Kategori Kendaraan",
+          description: "Belum ada tipe/kategori kendaraan terdaftar dalam sistem.",
+          actionLabel: "Tambah Kategori",
+          onAction: () => handleOpenModal(),
+        }}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -158,11 +153,11 @@ export default function VehicleTypesPage() {
               </div>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Description</label>
-                <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500" />
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500" rows={2} />
               </div>
               <div className="flex justify-end gap-2 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save"}</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-semibold disabled:opacity-50">{submitting ? "Saving..." : "Save"}</button>
               </div>
             </form>
           </div>

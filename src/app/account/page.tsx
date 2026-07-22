@@ -18,8 +18,10 @@ import {
 } from "lucide-react";
 import { usersService } from "@/services/users.service";
 import { UserResponse } from "@/types/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AccountPage() {
+  const { updateUser } = useAuth();
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -71,6 +73,14 @@ export default function AccountPage() {
 
     try {
       await usersService.updateAccount({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        image: formData.image,
+      });
+
+      // Synchronize updated user profile in AuthContext
+      updateUser({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,

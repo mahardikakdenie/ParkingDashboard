@@ -8,6 +8,7 @@ import {
   Gamepad2,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Box,
   LayoutDashboard,
   Receipt,
@@ -27,6 +28,7 @@ import {
   Sliders,
   Sparkles,
   LucideIcon,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -123,6 +125,7 @@ export function Sidebar() {
   const { sidebarOpen, setSidebarOpen } = useParking();
   const { user, logout } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
   const [dynamicSections, setDynamicSections] = useState<MenuSection[]>([]);
   const [isLoadingMenus, setIsLoadingMenus] = useState<boolean>(true);
 
@@ -443,33 +446,133 @@ export function Sidebar() {
           <div className="absolute bottom-0 left-0 right-0 h-4 bg-linear-to-t from-slate-900/90 to-transparent pointer-events-none z-10" />
         </div>
 
-        {/* Footer user panel */}
-        <div className="p-3.5 border-t border-slate-800/80 bg-linear-to-t from-slate-950/90 via-slate-900/80 to-slate-900/40 relative z-20">
-          <div className="p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 backdrop-blur-md flex items-center justify-between gap-3 shadow-inner">
-            <div className="flex items-center gap-3 min-w-0">
+        {/* Footer User Panel (Current User Login Info & Actions) */}
+        <div className="p-3 border-t border-slate-800/80 bg-linear-to-t from-slate-950/95 via-slate-900/90 to-slate-900/50 relative z-20">
+          
+          {/* Quick Action Popover Drawer */}
+          {showUserMenu && (
+            <div className="absolute bottom-full left-3 right-3 mb-2 p-2 bg-slate-900/95 border border-slate-800 rounded-2xl shadow-2xl backdrop-blur-xl space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-200 z-30">
+              <div className="px-3 py-2 border-b border-slate-800/80 flex items-center justify-between">
+                <div className="min-w-0 pr-2">
+                  <p className="text-[11px] font-medium text-slate-400">Signed in as</p>
+                  <p className="text-xs font-bold text-white truncate">
+                    @{user?.username || (user?.email ? user.email.split("@")[0] : "user")}
+                  </p>
+                </div>
+                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 font-mono font-medium px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Active
+                </span>
+              </div>
+
+              <Link
+                href="/account"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all group"
+              >
+                <User className="w-4 h-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
+                <span className="font-medium">Account Profile</span>
+              </Link>
+
+              <Link
+                href="/change-password"
+                onClick={() => {
+                  setShowUserMenu(false);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center gap-2.5 px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-slate-800/70 rounded-xl transition-all group"
+              >
+                <Lock className="w-4 h-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                <span className="font-medium">Security & Password</span>
+              </Link>
+
+              <div className="pt-1 border-t border-slate-800/60">
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer group"
+                >
+                  <LogOut className="w-4 h-4 text-red-400 group-hover:translate-x-0.5 transition-transform" />
+                  <span className="font-medium">Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* User Info Card Trigger */}
+          <div className="p-2 rounded-2xl bg-slate-900/90 border border-slate-800/80 hover:border-slate-700/80 backdrop-blur-md flex items-center justify-between gap-2.5 shadow-inner group/card transition-all duration-200">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer group/btn"
+              title="Click to toggle user options"
+            >
+              {/* Avatar with Image or Initial Fallback */}
               <div className="relative shrink-0">
-                <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-indigo-500 to-blue-500 p-0.5">
-                  <img
-                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                    alt="Admin Avatar"
-                    className="w-full h-full object-cover rounded-[10px]"
-                  />
+                <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-indigo-600 via-blue-600 to-indigo-400 p-0.5 shadow-md shadow-indigo-950/40">
+                  {user?.image ? (
+                    <img
+                      src={user.image}
+                      alt={user.name || "User Avatar"}
+                      className="w-full h-full object-cover rounded-[9px]"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-950 rounded-[9px] flex items-center justify-center font-bold text-[11px] text-indigo-300 tracking-tight overflow-hidden">
+                      {user?.name ? (
+                        user.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .substring(0, 2)
+                          .toUpperCase()
+                      ) : (
+                        "US"
+                      )}
+                    </div>
+                  )}
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-white truncate">{user?.name || "Admin Sudirman"}</div>
-                <div className="text-[10px] text-indigo-400/90 font-mono truncate">{user?.role || "Central Manager"}</div>
+
+              {/* Dynamic User Name & Role */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold text-white truncate group-hover/btn:text-blue-300 transition-colors">
+                    {user?.name || user?.username || "User"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-indigo-400 font-mono truncate">
+                    {user?.role || (user?.roles && user.roles[0]) || "User Role"}
+                  </span>
+                </div>
               </div>
-            </div>
+
+              {/* Toggle Chevron Icon */}
+              <div className="p-1 text-slate-500 group-hover/btn:text-slate-300 transition-colors shrink-0">
+                {showUserMenu ? (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                )}
+              </div>
+            </button>
+
+            {/* Direct Logout Button */}
+            <div className="h-6 w-px bg-slate-800 shrink-0" />
             <button
               onClick={logout}
               title="Sign Out"
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 border border-transparent rounded-xl transition-all shrink-0 cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 hover:border-red-500/20 border border-transparent rounded-xl transition-all shrink-0 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
           </div>
+
         </div>
       </aside>
     </>
