@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Plus, RefreshCw, Wallet } from "lucide-react";
 import { topupsService } from "@/services/topups.service";
 import { customersService } from "@/services/customers.service";
-import { TopupItem, CustomerItem } from "@/types/api";
+import { TopupItem, CustomerItem, TopupMethod } from "@/types/api";
 import { DataTable, Column } from "@/components/DataTable";
 
 export default function TopupPage() {
@@ -14,8 +14,19 @@ export default function TopupPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
-  const [formData, setFormData] = useState({ customer_id: "", amount: 50000, method: "CASH", notes: "" });
+  const [formData, setFormData] = useState<{
+    customer_id: string;
+    amount: number;
+    method: TopupMethod;
+    notes: string;
+  }>({
+    customer_id: "",
+    amount: 50000,
+    method: "cash",
+    notes: "",
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchTopups = useCallback(async () => {
     setLoading(true);
@@ -34,6 +45,7 @@ export default function TopupPage() {
   }, [fetchTopups]);
 
   const handleOpenModal = async () => {
+    setError(null);
     try {
       const res = await customersService.getList({ page: 1, limit: 100 });
       setCustomers(res.items || []);
@@ -49,12 +61,14 @@ export default function TopupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setError(null);
     try {
       await topupsService.create(formData);
       setIsModalOpen(false);
       fetchTopups();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Topup submission failed", err);
+      setError(err?.message || "Failed to process topup deposit");
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +93,20 @@ export default function TopupPage() {
     {
       key: "method",
       header: "Method",
-      render: (t) => <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded font-mono text-[10px]">{t.method}</span>,
+      render: (t) => {
+        const m = (t.method || "").toLowerCase();
+        const labelMap: Record<string, string> = {
+          cash: "CASH",
+          transfer: "TRANSFER",
+          va: "VA",
+          qris: "QRIS",
+        };
+        return (
+          <span className="px-2 py-0.5 bg-slate-800 text-emerald-400 border border-emerald-500/20 rounded font-mono text-[10px] uppercase font-semibold">
+            {labelMap[m] || t.method}
+          </span>
+        );
+      },
     },
     {
       key: "created_at",
@@ -131,6 +158,11 @@ export default function TopupPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
             <h2 className="text-lg font-bold text-white">New Topup Deposit</h2>
+            {error && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400">
+                {error}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Customer Member</label>
@@ -146,10 +178,11 @@ export default function TopupPage() {
               </div>
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Payment Method</label>
-                <select value={formData.method} onChange={(e) => setFormData({ ...formData, method: e.target.value })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
-                  <option value="CASH">CASH</option>
-                  <option value="BANK_TRANSFER">BANK TRANSFER</option>
-                  <option value="EWALLET">E-WALLET</option>
+                <select value={formData.method} onChange={(e) => setFormData({ ...formData, method: e.target.value as TopupMethod })} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                  <option value="cash">Cash (Tunai)</option>
+                  <option value="transfer">Bank Transfer</option>
+                  <option value="va">Virtual Account (VA)</option>
+                  <option value="qris">QRIS</option>
                 </select>
               </div>
               <div>
@@ -167,3 +200,4 @@ export default function TopupPage() {
     </div>
   );
 }
+

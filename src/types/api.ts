@@ -96,10 +96,12 @@ export interface CreateRoleDto {
   description: string;
 }
 
+export type TopupMethod = 'cash' | 'transfer' | 'va' | 'qris';
+
 export interface CreateTopupDto {
   customer_id: string;
   amount: number;
-  method?: string;
+  method?: TopupMethod;
   notes?: string;
 }
 
@@ -204,7 +206,7 @@ export interface DetailTopupResponse {
   customer_id: string;
   customer_name: string;
   amount: number;
-  method: string;
+  method: TopupMethod | string;
   status: string;
   reference: string;
   notes: string;
@@ -481,7 +483,7 @@ export interface TopupItem {
   id: string;
   customer_name: string;
   amount: number;
-  method: string;
+  method: TopupMethod | string;
   status: string;
   reference: string;
   created_at: string;
