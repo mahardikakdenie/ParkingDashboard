@@ -12,12 +12,13 @@ interface SimulationHUDProps {
 const phaseLabels: Record<SimulationPhase, string> = {
   IDLE: "Siap – Gerakkan mobil ke Gate Masuk",
   APPROACHING_ENTRY: "Mendekati Gate Masuk…",
-  OCR_SCANNING: "Memindai Plat Nomor…",
+  ENTRY_LOADING: "Menghubungi API /check-in…",
+  ENTRY_MODAL: "Check-In Berhasil – Tinjau Tiket",
   ENTRY_GATE_OPEN: "Gate Terbuka – Silakan Masuk!",
   PARKED: "Di Dalam Area Parkir – Gerak ke Gate Keluar",
   APPROACHING_EXIT: "Mendekati Gate Keluar…",
-  EXIT_OCR_SCANNING: "Verifikasi Kendaraan…",
-  EXIT_PAYMENT: "Kalkulasi Tarif – Silakan Bayar",
+  EXIT_LOADING: "Menghubungi API /check-out…",
+  EXIT_PAYMENT: "Check-Out Berhasil – Tinjau Biaya",
   EXIT_GATE_OPEN: "Gate Keluar Terbuka – Selamat Jalan!",
   COMPLETED: "Simulasi Selesai! Tekan Reset untuk Ulangi",
 };
@@ -25,12 +26,13 @@ const phaseLabels: Record<SimulationPhase, string> = {
 const phaseColors: Record<SimulationPhase, string> = {
   IDLE: "#94A3B8",
   APPROACHING_ENTRY: "#60A5FA",
-  OCR_SCANNING: "#A78BFA",
+  ENTRY_LOADING: "#FBBF24",
+  ENTRY_MODAL: "#10B981",
   ENTRY_GATE_OPEN: "#34D399",
   PARKED: "#60A5FA",
   APPROACHING_EXIT: "#FBBF24",
-  EXIT_OCR_SCANNING: "#A78BFA",
-  EXIT_PAYMENT: "#FBBF24",
+  EXIT_LOADING: "#FBBF24",
+  EXIT_PAYMENT: "#10B981",
   EXIT_GATE_OPEN: "#34D399",
   COMPLETED: "#34D399",
 };
@@ -45,8 +47,7 @@ function ElapsedTimer({ startTime }: { startTime: Date | null }) {
     }
     const update = () => {
       const now = Date.now();
-      // Apply time multiplier for display
-      const diffMs = (now - startTime.getTime()) * 300;
+      const diffMs = Math.max(0, now - startTime.getTime()); // Normal 1:1 real time
       const totalSecs = Math.floor(diffMs / 1000);
       const h = Math.floor(totalSecs / 3600).toString().padStart(2, "0");
       const m = Math.floor((totalSecs % 3600) / 60).toString().padStart(2, "0");
@@ -61,15 +62,13 @@ function ElapsedTimer({ startTime }: { startTime: Date | null }) {
   return <span className="font-mono">{elapsed}</span>;
 }
 
-// Minimap: top-down 2D minimap
 function Minimap() {
   const SIZE = 120;
-  const WORLD = 36; // world radius
+  const WORLD = 36;
   const scale = SIZE / (WORLD * 2);
 
   const dotRef = useRef<HTMLDivElement>(null);
 
-  // Initial position: x = -4.5, z = 24
   const initialCx = SIZE / 2 + (-4.5) * scale;
   const initialCy = SIZE / 2 + 24 * scale;
 
@@ -89,7 +88,6 @@ function Minimap() {
     return () => window.removeEventListener("car-moved", handleCarMoved);
   }, [scale]);
 
-  // Entry gate at ~(-4.5, 20), exit gate at ~(8.5, 20) in world space
   const entryGateX = SIZE / 2 + (-4.5) * scale;
   const exitGateX = SIZE / 2 + 8.5 * scale;
   const gateY = SIZE / 2 + 20 * scale;
@@ -104,7 +102,6 @@ function Minimap() {
         border: "1px solid rgba(59,130,246,0.3)",
       }}
     >
-      {/* Parking lot area */}
       <div
         className="absolute"
         style={{
@@ -116,7 +113,6 @@ function Minimap() {
           border: "1px solid rgba(59,130,246,0.2)",
         }}
       />
-      {/* Driving lane */}
       <div
         className="absolute"
         style={{
@@ -127,7 +123,6 @@ function Minimap() {
           background: "rgba(15,23,42,0.9)",
         }}
       />
-      {/* Entry gate marker */}
       <div
         className="absolute w-2 h-2 rounded-full"
         style={{
@@ -137,7 +132,6 @@ function Minimap() {
           boxShadow: "0 0 6px #22C55E",
         }}
       />
-      {/* Exit gate marker */}
       <div
         className="absolute w-2 h-2 rounded-full"
         style={{
@@ -147,7 +141,6 @@ function Minimap() {
           boxShadow: "0 0 6px #EF4444",
         }}
       />
-      {/* Car dot */}
       <div
         ref={dotRef}
         className="absolute w-3 h-4 rounded-sm"
@@ -161,11 +154,9 @@ function Minimap() {
           border: "1px solid #FCA5A5",
         }}
       />
-      {/* Labels */}
       <div className="absolute bottom-1 left-1 text-[7px] text-slate-500 uppercase tracking-widest">
         Minimap
       </div>
-      {/* Legend */}
       <div className="absolute bottom-1 right-1 flex flex-col gap-0.5">
         <div className="flex items-center gap-1">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -187,7 +178,6 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-20">
-
       {/* ===== TOP BAR ===== */}
       <div
         className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3"
@@ -213,8 +203,22 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
           </div>
         </div>
 
-        {/* Timer & Gate Status */}
+        {/* User Card & Gate Status */}
         <div className="flex items-center gap-3">
+          {/* Active Logged-In User & Card Badge */}
+          <div
+            className="px-3 py-1.5 rounded-lg text-right hidden sm:block pointer-events-auto"
+            style={{ background: "rgba(30,41,59,0.9)", border: "1px solid rgba(59,130,246,0.4)" }}
+          >
+            <div className="text-[8px] text-blue-400 uppercase tracking-widest font-bold">User Logging Active</div>
+            <div className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
+              <span>{state.customerName}</span>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[10px] border border-emerald-500/30">
+                {state.cardNumber}
+              </span>
+            </div>
+          </div>
+
           {/* Timer */}
           {state.entryTime && (
             <div
@@ -234,7 +238,7 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
             style={{ background: "rgba(30,41,59,0.9)", border: "1px solid rgba(100,116,139,0.3)" }}
           >
             <div className="text-center">
-              <div className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">IN</div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">IN (/check-in)</div>
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold"
                 style={{
@@ -247,7 +251,7 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
               </div>
             </div>
             <div className="text-center">
-              <div className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">OUT</div>
+              <div className="text-[8px] text-slate-500 uppercase tracking-widest mb-1">OUT (/check-out)</div>
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold"
                 style={{
@@ -307,12 +311,11 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
 
         {/* Controls Guide */}
         <div
-          className="px-4 py-3 rounded-xl"
+          className="px-4 py-3 rounded-xl pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.7)", border: "1px solid rgba(100,116,139,0.3)" }}
         >
           <div className="text-[9px] text-slate-500 uppercase tracking-widest text-center mb-2">Kontrol Keyboard</div>
           <div className="flex flex-col items-center gap-1">
-            {/* Up arrow */}
             <div className="flex justify-center">
               <kbd
                 className="w-8 h-7 flex items-center justify-center rounded text-sm font-bold text-slate-300"
@@ -321,7 +324,6 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
                 ↑
               </kbd>
             </div>
-            {/* Left / Down / Right */}
             <div className="flex gap-1">
               {["←", "↓", "→"].map((key) => (
                 <kbd
@@ -333,7 +335,6 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
                 </kbd>
               ))}
             </div>
-            {/* Space */}
             <div className="flex justify-center mt-1">
               <kbd
                 className="px-4 h-7 flex items-center justify-center rounded text-[10px] font-bold text-slate-300"
@@ -345,16 +346,19 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
           </div>
         </div>
 
-        {/* Plate Info */}
+        {/* Plate & User Info */}
         <div
-          className="px-4 py-3 rounded-xl"
+          className="px-4 py-3 rounded-xl min-w-52 pointer-events-auto"
           style={{ background: "rgba(0,0,0,0.7)", border: "1px solid rgba(100,116,139,0.3)" }}
         >
-          <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1.5">Kendaraan</div>
+          <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1.5">Kendaraan & Card</div>
           <div className="font-mono text-sm font-bold text-white tracking-widest mb-1">
             {state.plateNumber}
           </div>
-          <div className="text-[9px] text-slate-400">Daihatsu Ayla · Merah</div>
+          <div className="text-[10px] text-slate-300 flex items-center gap-1 font-mono">
+            <span>Card:</span>
+            <span className="text-emerald-400 font-bold">{state.cardNumber}</span>
+          </div>
           <div className="mt-2 flex items-center gap-1.5">
             <div
               className="w-1.5 h-1.5 rounded-full"
@@ -381,7 +385,7 @@ export function SimulationHUD({ state, onReset }: SimulationHUDProps) {
             <div className="text-5xl mb-3">🎉</div>
             <h2 className="text-2xl font-bold text-white mb-2">Simulasi Selesai!</h2>
             <p className="text-slate-400 text-sm mb-6">
-              Kendaraan B 8789 DI telah berhasil keluar dari area parkir.
+              Kendaraan {state.plateNumber} dengan Card <span className="text-emerald-400 font-mono font-bold">{state.cardNumber}</span> telah berhasil keluar dari area parkir.
             </p>
             <button
               onClick={onReset}

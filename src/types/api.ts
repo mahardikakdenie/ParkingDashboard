@@ -617,3 +617,135 @@ export interface VerifyOtpDto {
   token: string;
 }
 
+// ==========================================
+// Notifications Module Contracts
+// ==========================================
+
+export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+
+export interface NotificationItem {
+  id: string;
+  user_id?: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  is_read: boolean;
+  meta?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListNotificationQueryParams extends BaseQueryParams {
+  is_read?: boolean;
+  type?: NotificationType;
+}
+
+export interface ListNotificationResponse {
+  items: NotificationItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UnreadCountResponse {
+  unread_count?: number;
+  count?: number;
+}
+
+// ==========================================
+// Demo Simulation Module Contracts
+// ==========================================
+
+export interface CheckInDto {
+  card_number: string;
+  vehicle_plate: string;
+  vehicle_type_id: string;
+}
+
+export interface CheckOutDto {
+  card_number: string;
+}
+
+export interface CheckInData {
+  id: string;
+  card_number: string;
+  balance: number;
+  vehicle_plate: string;
+  check_in_at: string;
+  status: string;
+}
+
+export interface CheckInResponse {
+  success: boolean;
+  message: string;
+  data: CheckInData;
+}
+
+export interface CheckOutData {
+  id: string;
+  card_number: string;
+  balance_before: number;
+  balance_after: number;
+  check_in_at: string;
+  check_out_at: string;
+  duration_minutes: number;
+  amount: number;
+  status: string;
+}
+
+export interface CheckOutResponse {
+  success: boolean;
+  message: string;
+  data: CheckOutData;
+}
+
+// ==========================================
+// Payment Gateway Webhook Contracts
+// ==========================================
+
+export interface PaymentWebhookDto {
+  provider: string;
+  payload: Record<string, any>;
+}
+
+export interface PaymentWebhookResponse {
+  success: boolean;
+  message: string;
+  provider: string;
+  processed_at: string;
+}
+
+export interface TopupMetadataAction {
+  name: string;
+  method: string;
+  url: string;
+}
+
+export interface TopupMetadata {
+  status_code?: string;
+  status_message?: string;
+  transaction_id?: string;
+  order_id?: string;
+  merchant_id?: string;
+  gross_amount?: string;
+  currency?: string;
+  payment_type?: string;
+  transaction_time?: string;
+  transaction_status?: string;
+  fraud_status?: string;
+  actions?: TopupMetadataAction[];
+  acquirer?: string;
+  qr_string?: string;
+  expiry_time?: string;
+}
+
+export interface CreateTopupResponse {
+  id: string;
+  amount: number;
+  method: TopupMethod | string;
+  status: string;
+  metadata?: TopupMetadata;
+}
+
+

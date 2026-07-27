@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Stars } from "@react-three/drei";
 import * as THREE from "three";
@@ -68,8 +68,9 @@ function CarController({
   useFrame((_, delta) => {
     const phase = simState.phase;
     const isOcrActive =
-      phase === "OCR_SCANNING" ||
-      phase === "EXIT_OCR_SCANNING" ||
+      phase === "ENTRY_LOADING" ||
+      phase === "ENTRY_MODAL" ||
+      phase === "EXIT_LOADING" ||
       phase === "EXIT_PAYMENT";
 
     // Block movement during OCR/payment
@@ -236,66 +237,69 @@ export function ParkingScene({
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, alpha: false }}
     >
-      {/* Sky & Stars */}
-      <color attach="background" args={["#020818"]} />
-      <Stars radius={120} depth={60} count={4000} factor={4} fade speed={0.5} />
+      <Suspense fallback={null}>
+        {/* Sky & Stars */}
+        <color attach="background" args={["#020818"]} />
+        <Stars radius={120} depth={60} count={4000} factor={4} fade speed={0.5} />
 
-      {/* Ambient light */}
-      <ambientLight intensity={0.35} color="#A8D0FF" />
+        {/* Ambient light */}
+        <ambientLight intensity={0.35} color="#A8D0FF" />
 
-      {/* Moon-like directional light */}
-      <directionalLight
-        position={[15, 25, 10]}
-        intensity={1.2}
-        color="#D6E8FF"
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={100}
-        shadow-camera-left={-25}
-        shadow-camera-right={25}
-        shadow-camera-top={25}
-        shadow-camera-bottom={-25}
-        shadow-bias={-0.001}
-      />
+        {/* Moon-like directional light */}
+        <directionalLight
+          position={[15, 25, 10]}
+          intensity={1.2}
+          color="#D6E8FF"
+          castShadow
+          shadow-mapSize={[2048, 2048]}
+          shadow-camera-far={100}
+          shadow-camera-left={-25}
+          shadow-camera-right={25}
+          shadow-camera-top={25}
+          shadow-camera-bottom={-25}
+          shadow-bias={-0.001}
+        />
 
-      {/* Entry gate area fill light */}
-      <pointLight position={[-4.5, 5, 20]} color="#22C55E" intensity={15} distance={12} />
-      {/* Exit gate area fill light */}
-      <pointLight position={[8.5, 5, 20]} color="#EF4444" intensity={12} distance={12} />
-      {/* General area fill */}
-      <pointLight position={[0, 12, 0]} color="#3B82F6" intensity={8} distance={30} />
+        {/* Entry gate area fill light */}
+        <pointLight position={[-4.5, 5, 20]} color="#22C55E" intensity={15} distance={12} />
+        {/* Exit gate area fill light */}
+        <pointLight position={[8.5, 5, 20]} color="#EF4444" intensity={12} distance={12} />
+        {/* General area fill */}
+        <pointLight position={[0, 12, 0]} color="#3B82F6" intensity={8} distance={30} />
 
-      {/* === PARKING ENVIRONMENT === */}
-      <ParkingEnvironment />
+        {/* === PARKING ENVIRONMENT === */}
+        <ParkingEnvironment />
 
-      {/* === ENTRY GATE === */}
-      <GateBarrier
-        position={[-4.5, 0, 18]}
-        isOpen={simState.entryGateOpen}
-        type="entry"
-        label="● GATE MASUK"
-      />
+        {/* === ENTRY GATE === */}
+        <GateBarrier
+          position={[-4.5, 0, 18]}
+          isOpen={simState.entryGateOpen}
+          type="entry"
+          label="● GATE MASUK"
+        />
 
-      {/* === EXIT GATE === */}
-      <GateBarrier
-        position={[8.5, 0, 18]}
-        isOpen={simState.exitGateOpen}
-        type="exit"
-        label="● GATE KELUAR"
-      />
+        {/* === EXIT GATE === */}
+        <GateBarrier
+          position={[8.5, 0, 18]}
+          isOpen={simState.exitGateOpen}
+          type="exit"
+          label="● GATE KELUAR"
+        />
 
-      {/* === CAR CONTROLLER === */}
-      <CarController
-        simState={simState}
-        onEntryZone={onEntryZone}
-        onExitedEntryGate={onExitedEntryGate}
-        onExitZone={onExitZone}
-        onExitedExitGate={onExitedExitGate}
-        carPosRef={carPosRef}
-      />
+        {/* === CAR CONTROLLER === */}
+        <CarController
+          simState={simState}
+          onEntryZone={onEntryZone}
+          onExitedEntryGate={onExitedEntryGate}
+          onExitZone={onExitZone}
+          onExitedExitGate={onExitedExitGate}
+          carPosRef={carPosRef}
+        />
 
-      {/* === FOLLOW CAMERA === */}
-      <FollowCamera carPosRef={carPosRef} />
+        {/* === FOLLOW CAMERA === */}
+        <FollowCamera carPosRef={carPosRef} />
+      </Suspense>
     </Canvas>
   );
 }
+

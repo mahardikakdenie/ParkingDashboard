@@ -113,7 +113,6 @@ export function GateBarrier({ position, isOpen, type, label }: GateBarrierProps)
         color={labelColor}
         anchorX="center"
         anchorY="middle"
-        font="https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me5Q.ttf"
         fontWeight="bold"
       >
         {label || (type === "entry" ? "● MASUK" : "● KELUAR")}

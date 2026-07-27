@@ -12,3 +12,6 @@ export * from './transactions.service';
 export * from './topups.service';
 export * from './upload.service';
 export * from './health-cron.service';
+export * from './notifications.service';
+export * from './demo.service';
+export * from './payment-gateway.service';

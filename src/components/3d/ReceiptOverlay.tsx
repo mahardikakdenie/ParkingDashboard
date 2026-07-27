@@ -1,250 +1,169 @@
 "use client";
 
-import { useState } from "react";
 import { SimulationState } from "@/hooks/useParkingSimulation";
-import { QrCode } from "lucide-react";
+import { formatWibDateTime } from "./CheckInOverlay";
+import { Loader2, CheckCircle2, CreditCard, Clock, Wallet } from "lucide-react";
 
 interface ReceiptOverlayProps {
   state: SimulationState;
   onConfirmPayment: () => void;
 }
 
-function formatTime(date: Date | null) {
-  if (!date) return "–";
-  return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
-function formatDate(date: Date | null) {
-  if (!date) return "–";
-  return date.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
-}
-
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(amount);
 }
 
 export function ReceiptOverlay({ state, onConfirmPayment }: ReceiptOverlayProps) {
+  const isLoading = state.phase === "EXIT_LOADING";
   const isVisible = state.phase === "EXIT_PAYMENT";
-  const [selectedPayment, setSelectedPayment] = useState<"ewallet" | "qris" | null>(null);
 
-  if (!isVisible) return null;
+  if (!isLoading && !isVisible) return null;
 
-  const hours = Math.ceil(
-    state.entryTime && state.exitTime
-      ? ((state.exitTime.getTime() - state.entryTime.getTime()) * 300) / 3600000
-      : 1
-  );
+  const data = state.checkOutData;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-30">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
-      />
+    <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+      {/* Dark Glass Backdrop */}
+      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md animate-fade-in" />
 
-      {/* Receipt Panel */}
+      {/* Modal Card */}
       <div
-        className="relative z-10 w-[90%] max-w-110 max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
+        className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden flex flex-col shadow-2xl border border-amber-500/30"
         style={{
-          background: "linear-gradient(160deg, #0F172A 0%, #1a2744 100%)",
-          border: "1px solid rgba(251,191,36,0.3)",
-          boxShadow: "0 0 60px rgba(251,191,36,0.15), 0 0 120px rgba(251,191,36,0.08)",
+          background: "linear-gradient(165deg, #0B1329 0%, #1A1F38 100%)",
+          boxShadow: "0 0 50px rgba(245, 158, 11, 0.15)",
         }}
       >
-        {/* Header */}
-        <div
-          className="px-6 py-5 text-center shrink-0"
-          style={{
-            background: "linear-gradient(135deg, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.05) 100%)",
-            borderBottom: "1px solid rgba(251,191,36,0.2)",
-          }}
-        >
-          <div className="text-[10px] uppercase tracking-[0.3em] text-amber-400/70 mb-1">
-            NEXGATE SYSTEM
-          </div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Struk Parkir</h2>
-          <div className="text-[11px] text-slate-400 mt-1">
-            {formatDate(state.exitTime)}
-          </div>
-        </div>
-
-        {/* Receipt Body */}
-        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
-          {/* Plate */}
-          <div className="text-center">
-            <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-2">Nomor Kendaraan</div>
-            <div
-              className="inline-block px-6 py-2 rounded-lg font-mono text-2xl font-bold text-white tracking-widest"
-              style={{
-                background: "#111827",
-                border: "2px solid rgba(251,191,36,0.5)",
-                boxShadow: "0 0 20px rgba(251,191,36,0.1)",
-              }}
-            >
-              {state.plateNumber}
+        {/* Loading State */}
+        {isLoading && (
+          <div className="py-12 px-6 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full border-4 border-amber-500/20 border-t-amber-500 animate-spin flex items-center justify-center" />
+              <Loader2 className="w-8 h-8 text-amber-400 animate-spin absolute inset-0 m-auto" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-white tracking-wide">Proses Check-Out</h3>
+              <p className="text-xs text-slate-400">Menghubungkan ke API <span className="font-mono text-amber-400">/check-out</span>...</p>
             </div>
           </div>
+        )}
 
-          {/* Dashed separator */}
-          <div className="border-t border-dashed border-slate-700" />
-
-          {/* Times */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-800/60 rounded-xl p-3 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center justify-center gap-1">
-                <span>🟢</span> Waktu Masuk
-              </div>
-              <div className="font-mono text-sm font-bold text-emerald-400">
-                {formatTime(state.entryTime)}
-              </div>
-              <div className="text-[9px] text-slate-500 mt-1">Gate Masuk</div>
-            </div>
-            <div className="bg-slate-800/60 rounded-xl p-3 text-center">
-              <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1.5 flex items-center justify-center gap-1">
-                <span>🔴</span> Waktu Keluar
-              </div>
-              <div className="font-mono text-sm font-bold text-rose-400">
-                {formatTime(state.exitTime)}
-              </div>
-              <div className="text-[9px] text-slate-500 mt-1">Gate Keluar</div>
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div
-            className="flex items-center justify-between rounded-xl px-4 py-3"
-            style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)" }}
-          >
-            <span className="text-[10px] text-slate-400 uppercase tracking-widest">Durasi Parkir</span>
-            <span className="font-mono text-sm font-bold text-blue-400">{state.duration || "< 1 menit"}</span>
-          </div>
-
-          {/* Fee breakdown */}
-          <div className="bg-slate-800/40 rounded-xl overflow-hidden">
-            <div className="px-4 py-2 border-b border-slate-700">
-              <div className="text-[9px] text-slate-500 uppercase tracking-widest">Rincian Tarif</div>
-            </div>
-            <div className="px-4 py-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-400">Jam pertama (1 jam)</span>
-                <span className="text-slate-300 font-mono">{formatCurrency(5000)}</span>
-              </div>
-              {hours > 1 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">
-                    Jam berikutnya ({hours - 1} jam × Rp 3.000)
-                  </span>
-                  <span className="text-slate-300 font-mono">
-                    {formatCurrency((hours - 1) * 3000)}
-                  </span>
+        {/* Check-Out Response Data State */}
+        {isVisible && data && (
+          <div className="flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-slate-800 bg-linear-to-r from-amber-500/15 to-transparent flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
-              )}
-              <div className="border-t border-slate-700 pt-2 flex justify-between">
-                <span className="text-xs text-slate-400">Subtotal</span>
-                <span className="text-xs text-slate-300 font-mono">{formatCurrency(state.parkingFee)}</span>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Gate Keluar</div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">Check-Out Berhasil</h2>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                {data.status}
+              </span>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Card Number */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <CreditCard className="w-4 h-4 text-amber-400" />
+                  <span>Nomor Kartu</span>
+                </div>
+                <div className="font-mono text-sm font-bold text-white">{data.card_number}</div>
+              </div>
+
+              {/* Balance Summary */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Wallet className="w-3 h-3 text-slate-400" />
+                    <span>Saldo Awal</span>
+                  </div>
+                  <div className="font-mono text-sm font-bold text-slate-200">
+                    {formatCurrency(data.balance_before)}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Wallet className="w-3 h-3 text-emerald-400" />
+                    <span>Saldo Akhir</span>
+                  </div>
+                  <div className="font-mono text-sm font-bold text-emerald-400">
+                    {formatCurrency(data.balance_after)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dates WIB */}
+              <div className="space-y-2 bg-slate-900/40 border border-slate-800 rounded-xl p-3.5">
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-emerald-400" />
+                    <span>Waktu Check-In (+7 WIB)</span>
+                  </div>
+                  <div className="font-mono text-xs font-medium text-slate-300">
+                    {formatWibDateTime(data.check_in_at)}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-800/80 pt-2">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-rose-400" />
+                    <span>Waktu Check-Out (+7 WIB)</span>
+                  </div>
+                  <div className="font-mono text-xs font-medium text-slate-300">
+                    {formatWibDateTime(data.check_out_at)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Duration & Fee Breakdown */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Durasi</div>
+                  <div className="font-mono text-sm font-bold text-blue-400">
+                    {data.duration_minutes} Menit
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+                  <div className="text-[10px] text-amber-400 uppercase tracking-wider mb-1 font-bold">Total Biaya</div>
+                  <div className="font-mono text-base font-bold text-amber-400">
+                    {formatCurrency(data.amount)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction ID */}
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-800/80">
+                <span>Transaction ID:</span>
+                <span className="font-mono text-slate-400 text-[10px]">{data.id}</span>
               </div>
             </div>
-          </div>
 
-          {/* Total */}
-          <div
-            className="flex items-center justify-between rounded-xl px-4 py-4"
-            style={{
-              background: "linear-gradient(135deg, rgba(251,191,36,0.2) 0%, rgba(251,191,36,0.08) 100%)",
-              border: "1px solid rgba(251,191,36,0.3)",
-            }}
-          >
-            <span className="text-sm font-bold text-white uppercase tracking-wide">Total Pembayaran</span>
-            <span className="text-xl font-bold text-amber-400 font-mono">
-              {formatCurrency(state.parkingFee)}
-            </span>
-          </div>
-
-          {/* Payment Selection UI */}
-          <div className="space-y-2 pt-1">
-            <div className="text-[9px] text-slate-500 uppercase tracking-widest text-center">
-              Pilih Metode Pembayaran
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            {/* Action Footer (Close Button replacing payment) */}
+            <div className="p-4 bg-slate-900/40 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => setSelectedPayment("ewallet")}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
-                  selectedPayment === "ewallet"
-                    ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
-                    : "bg-slate-800/40 border-slate-750/60 text-slate-400 hover:bg-slate-800/80 hover:border-slate-650"
-                }`}
+                onClick={onConfirmPayment}
+                className="w-full py-3 rounded-xl bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs uppercase tracking-widest transition-all duration-200 shadow-lg shadow-amber-500/20 active:scale-98"
               >
-                <span className="text-lg mb-1">📱</span>
-                <span className="text-xs font-bold uppercase tracking-wider">E-Wallet</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPayment("qris")}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
-                  selectedPayment === "qris"
-                    ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
-                    : "bg-slate-800/40 border-slate-750/60 text-slate-400 hover:bg-slate-800/80 hover:border-slate-650"
-                }`}
-              >
-                <span className="text-lg mb-1">📸</span>
-                <span className="text-xs font-bold uppercase tracking-wider">QRCODE QRIS</span>
+                Close
               </button>
             </div>
-
-            {/* Dummy QRIS QR Code display */}
-            {selectedPayment === "qris" && (
-              <div className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-slate-200 mt-3 transition-all duration-300">
-                <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100 flex items-center justify-center">
-                  <QrCode className="w-36 h-36 text-slate-900" />
-                </div>
-                <div className="text-[11px] font-bold text-slate-800 mt-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  QRIS DUMMY ACTIVE
-                </div>
-                <div className="text-[9px] text-slate-500 mt-0.5">
-                  Silakan scan untuk simulasi pembayaran
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Payment method note */}
-          <div className="text-center text-[10px] text-slate-500 pb-2">
-            Terima kasih atas kunjungan Anda
-          </div>
-        </div>
-
-        {/* Pay Button */}
-        <div
-          className="px-6 pb-6 pt-4 shrink-0"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <button
-            onClick={onConfirmPayment}
-            disabled={!selectedPayment}
-            className={`w-full py-4 rounded-xl text-sm font-bold uppercase tracking-widest text-black transition-all duration-200 active:scale-95 ${
-              !selectedPayment ? "opacity-50 cursor-not-allowed bg-slate-600 text-slate-400" : ""
-            }`}
-            style={{
-              background: selectedPayment ? "linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)" : "#475569",
-              boxShadow: selectedPayment ? "0 4px 24px rgba(251,191,36,0.4)" : "none",
-            }}
-            onMouseEnter={(e) => {
-              if (!selectedPayment) return;
-              e.currentTarget.style.boxShadow = "0 4px 36px rgba(251,191,36,0.6)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              if (!selectedPayment) return;
-              e.currentTarget.style.boxShadow = "0 4px 24px rgba(251,191,36,0.4)";
-              e.currentTarget.style.transform = "translateY(0)";
-            }}
-          >
-            💳 {selectedPayment ? `Bayar dengan ${selectedPayment === "qris" ? "QRIS" : "E-Wallet"}` : "Pilih Pembayaran"}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -187,7 +187,6 @@ export function CarModel({ position, rotation }: CarModelProps) {
         color="#FFFFFF"
         anchorX="center"
         anchorY="middle"
-        font="https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me5Q.ttf"
       >
         B 8789 DI
       </Text>
@@ -204,7 +203,6 @@ export function CarModel({ position, rotation }: CarModelProps) {
         anchorX="center"
         anchorY="middle"
         rotation={[0, Math.PI, 0]}
-        font="https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Me5Q.ttf"
       >
         B 8789 DI
       </Text>

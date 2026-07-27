@@ -29,6 +29,8 @@ import {
   Sparkles,
   LucideIcon,
   Settings,
+  Bell,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -93,6 +95,14 @@ const getMenuIcon = (iconName?: string): LucideIcon => {
     case "user":
     case "users":
       return User;
+    case "notification":
+    case "notifications":
+      return Bell;
+    case "paymentgateway":
+    case "payment-gateway":
+    case "webhook":
+    case "webhooks":
+      return CreditCard;
     case "account":
       return UserCog;
     case "lock":
@@ -106,19 +116,6 @@ const getMenuIcon = (iconName?: string): LucideIcon => {
   }
 };
 
-// Static Navigation Items (Operational Hub)
-const staticNavItems: NavItem[] = [
-  { icon: ScanText, label: "AI OCR Scanner", href: "/ocr" },
-  {
-    icon: Box,
-    label: "Gate Subsystem",
-    children: [
-      { label: "Gate In (Entry)", href: "/gate/in" },
-      { label: "Gate Out (Exit)", href: "/gate/out" },
-    ],
-  },
-  { icon: Gamepad2, label: "3D Digital Twin Demo", href: "/demo" },
-];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -267,87 +264,6 @@ export function Sidebar() {
         <div className="relative flex-1 min-h-0 flex flex-col">
           <div className="absolute top-0 left-0 right-0 h-4 bg-linear-to-b from-slate-900/90 to-transparent pointer-events-none z-10" />
           <div className="p-4 overflow-y-auto flex-1 custom-sidebar-scrollbar space-y-6 scroll-smooth pr-2 z-0">
-            {/* Static Operational Hub */}
-            <div>
-              <div className="flex items-center justify-between px-3 mb-2">
-                <span className="text-[10px] uppercase tracking-widest font-mono text-slate-400 font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-blue-400" />
-                  Operational Hub
-                </span>
-                <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20 font-mono font-medium">
-                  Core
-                </span>
-              </div>
-              <div className="space-y-1">
-                {staticNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const hasChildren = item.children && item.children.length > 0;
-                  const isExpanded = expandedMenus[item.label];
-                  const isChildActive = item.children?.some((c) => pathname === c.href);
-                  const isActive = pathname === item.href || isChildActive;
-
-                  return (
-                    <div key={item.label} className="mb-0.5">
-                      {hasChildren ? (
-                        <button
-                          onClick={() => toggleMenu(item.label)}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
-                            ? "bg-linear-to-r from-blue-600/20 via-indigo-600/15 to-transparent text-blue-400 font-semibold border border-blue-500/30 shadow-md shadow-blue-950/30"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${isActive ? "text-blue-400" : "text-slate-400"}`} />
-                            <span className="text-xs font-medium tracking-wide">{item.label}</span>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
-                          )}
-                        </button>
-                      ) : (
-                        <Link
-                          href={item.href!}
-                          onClick={() => setSidebarOpen(false)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group ${isActive
-                            ? "bg-linear-to-r from-blue-600/20 via-indigo-600/15 to-transparent text-blue-400 font-semibold border border-blue-500/30 shadow-md shadow-blue-950/30"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-                            }`}
-                        >
-                          <Icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${isActive ? "text-blue-400" : "text-slate-400"}`} />
-                          <span className="text-xs font-medium tracking-wide">{item.label}</span>
-                        </Link>
-                      )}
-
-                      {/* Child submenu */}
-                      {hasChildren && isExpanded && (
-                        <div className="mt-1 relative flex flex-col space-y-1 ml-4 pl-4 border-l border-slate-800">
-                          {item.children!.map((child) => {
-                            const isChildCurrent = pathname === child.href;
-                            return (
-                              <Link
-                                key={child.label}
-                                href={child.href}
-                                onClick={() => setSidebarOpen(false)}
-                                className={`block px-3 py-2 text-xs transition-all rounded-lg ${isChildCurrent
-                                  ? "text-blue-400 bg-blue-500/10 font-semibold border border-blue-500/20"
-                                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-                                  }`}
-                              >
-                                {child.label}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="h-px bg-linear-to-r from-transparent via-slate-800 to-transparent my-4" />
 
             {/* Dynamic sections */}
             {isLoadingMenus ? (

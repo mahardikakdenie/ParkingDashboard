@@ -1,13 +1,16 @@
 import { useState, useCallback, useRef } from "react";
+import { demoService } from "@/services/demo.service";
+import { CheckInData, CheckOutData } from "@/types/api";
 
 export type SimulationPhase =
   | "IDLE"
   | "APPROACHING_ENTRY"
-  | "OCR_SCANNING"
+  | "ENTRY_LOADING"
+  | "ENTRY_MODAL"
   | "ENTRY_GATE_OPEN"
   | "PARKED"
   | "APPROACHING_EXIT"
-  | "EXIT_OCR_SCANNING"
+  | "EXIT_LOADING"
   | "EXIT_PAYMENT"
   | "EXIT_GATE_OPEN"
   | "COMPLETED";
@@ -15,188 +18,188 @@ export type SimulationPhase =
 export interface SimulationState {
   phase: SimulationPhase;
   plateNumber: string;
+  cardNumber: string;
+  customerName: string;
+  vehicleTypeId: string;
+  transactionId: string | null;
   entryTime: Date | null;
   exitTime: Date | null;
-  ocrResult: string | null;
-  ocrProgress: number; // 0–100
-  ocrConfidence: number;
-  parkingFee: number;
-  duration: string;
   entryGateOpen: boolean;
   exitGateOpen: boolean;
+  apiError: string | null;
+  apiSuccessMessage: string | null;
+  isApiLoading: boolean;
+  checkInData: CheckInData | null;
+  checkOutData: CheckOutData | null;
 }
 
-const PLATE = "B 8789 DI";
-const HOUR_RATE_FIRST = 5000;
-const HOUR_RATE_NEXT = 3000;
-// Time multiplier: 1 real second = 5 simulated minutes
-const TIME_MULTIPLIER = 300;
-
-function calcFee(entryTime: Date, exitTime: Date): { fee: number; duration: string } {
-  const diffMs = (exitTime.getTime() - entryTime.getTime()) * TIME_MULTIPLIER;
-  const totalMinutes = Math.max(1, Math.floor(diffMs / 60000));
-  const hours = Math.ceil(totalMinutes / 60);
-  const displayH = Math.floor(totalMinutes / 60);
-  const displayM = totalMinutes % 60;
-  const duration = displayH > 0 ? `${displayH}j ${displayM}m` : `${displayM} menit`;
-
-  let fee = 0;
-  if (hours <= 1) {
-    fee = HOUR_RATE_FIRST;
-  } else {
-    fee = HOUR_RATE_FIRST + (hours - 1) * HOUR_RATE_NEXT;
-  }
-  return { fee, duration };
-}
+const STATIC_CARD_NUMBER = "CST-0001";
+const STATIC_VEHICLE_PLATE = "Minibus";
+const STATIC_VEHICLE_TYPE_ID = "609cf166-185b-4286-9fb2-f97d65490a0e";
 
 export function useParkingSimulation() {
   const [state, setState] = useState<SimulationState>({
     phase: "IDLE",
-    plateNumber: PLATE,
+    plateNumber: STATIC_VEHICLE_PLATE,
+    cardNumber: STATIC_CARD_NUMBER,
+    customerName: "Static Demo Account",
+    vehicleTypeId: STATIC_VEHICLE_TYPE_ID,
+    transactionId: null,
     entryTime: null,
     exitTime: null,
-    ocrResult: null,
-    ocrProgress: 0,
-    ocrConfidence: 0,
-    parkingFee: 0,
-    duration: "",
     entryGateOpen: false,
     exitGateOpen: false,
+    apiError: null,
+    apiSuccessMessage: null,
+    isApiLoading: false,
+    checkInData: null,
+    checkOutData: null,
   });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimer = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  };
-
-  // Called when car enters entry trigger zone
-  const triggerEntryOcr = useCallback(() => {
+  // Triggered when car reaches entry gate trigger zone
+  const triggerEntryOcr = useCallback(async () => {
     setState((s) => {
       if (s.phase !== "IDLE" && s.phase !== "APPROACHING_ENTRY") return s;
-      return { ...s, phase: "OCR_SCANNING", ocrResult: null, ocrProgress: 0, ocrConfidence: 0 };
+      return {
+        ...s,
+        phase: "ENTRY_LOADING",
+        isApiLoading: true,
+        apiError: null,
+        apiSuccessMessage: null,
+      };
     });
 
-    // Animate OCR progress 0→100 over 2.5s
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 4;
-      const confidence = Math.min(97.8, progress * 0.978);
-      setState((s) =>
-        s.phase === "OCR_SCANNING"
-          ? { ...s, ocrProgress: Math.min(progress, 100), ocrConfidence: parseFloat(confidence.toFixed(1)) }
-          : s
-      );
-      if (progress >= 100) {
-        clearInterval(interval);
-        // Show OCR result, then open gate
-        setState((s) =>
-          s.phase === "OCR_SCANNING"
-            ? { ...s, ocrResult: PLATE, phase: "OCR_SCANNING" }
-            : s
-        );
-        timerRef.current = setTimeout(() => {
-          const now = new Date();
-          setState((s) =>
-            s.phase === "OCR_SCANNING"
-              ? { ...s, phase: "ENTRY_GATE_OPEN", entryTime: now, entryGateOpen: true }
-              : s
-          );
-        }, 1000);
+    const nowIso = new Date().toISOString();
+    let resData: CheckInData = {
+      id: "28e6ebb9-d852-4472-9a1b-353b87e15cf1",
+      card_number: STATIC_CARD_NUMBER,
+      balance: 330000,
+      vehicle_plate: STATIC_VEHICLE_PLATE,
+      check_in_at: nowIso,
+      status: "active",
+    };
+
+    try {
+      const res = await demoService.checkIn({
+        card_number: STATIC_CARD_NUMBER,
+        vehicle_plate: STATIC_VEHICLE_PLATE,
+        vehicle_type_id: STATIC_VEHICLE_TYPE_ID,
+      });
+
+      if (res && res.data) {
+        resData = res.data;
       }
-    }, 100);
+    } catch (err: any) {
+      console.warn("Check-in API fallback to default mock response:", err?.message);
+    }
+
+    setState((s) => ({
+      ...s,
+      isApiLoading: false,
+      phase: "ENTRY_MODAL",
+      checkInData: resData,
+      transactionId: resData.id,
+      entryTime: new Date(resData.check_in_at),
+    }));
   }, []);
 
-  // Called when car has fully passed through entry gate
+  const closeEntryModal = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      entryGateOpen: true,
+      phase: "ENTRY_GATE_OPEN",
+    }));
+
+    timerRef.current = setTimeout(() => {
+      setState((s) => ({ ...s, entryGateOpen: false, phase: "PARKED" }));
+    }, 3000);
+  }, []);
+
   const onCarPassedEntryGate = useCallback(() => {
-    setState((s) => {
-      if (s.phase !== "ENTRY_GATE_OPEN") return s;
-      return { ...s, phase: "PARKED", entryGateOpen: false };
-    });
+    setState((s) => ({ ...s, entryGateOpen: false, phase: "PARKED" }));
   }, []);
 
-  // Called when car enters exit trigger zone
-  const triggerExitOcr = useCallback(() => {
-    setState((s) => {
-      if (s.phase !== "PARKED" && s.phase !== "APPROACHING_EXIT") return s;
-      return { ...s, phase: "EXIT_OCR_SCANNING", ocrResult: null, ocrProgress: 0, ocrConfidence: 0 };
-    });
+  // Triggered when car reaches exit gate trigger zone
+  const triggerExitOcr = useCallback(async () => {
+    setState((s) => ({
+      ...s,
+      phase: "EXIT_LOADING",
+      isApiLoading: true,
+      apiError: null,
+      apiSuccessMessage: null,
+    }));
 
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 4;
-      const confidence = Math.min(98.5, progress * 0.985);
-      setState((s) =>
-        s.phase === "EXIT_OCR_SCANNING"
-          ? { ...s, ocrProgress: Math.min(progress, 100), ocrConfidence: parseFloat(confidence.toFixed(1)) }
-          : s
-      );
-      if (progress >= 100) {
-        clearInterval(interval);
-        setState((s) => {
-          if (s.phase !== "EXIT_OCR_SCANNING") return s;
-          const exitTime = new Date();
-          const { fee, duration } = s.entryTime
-            ? calcFee(s.entryTime, exitTime)
-            : { fee: HOUR_RATE_FIRST, duration: "< 1 jam" };
-          return {
-            ...s,
-            ocrResult: PLATE,
-            phase: "EXIT_OCR_SCANNING",
-            exitTime,
-            parkingFee: fee,
-            duration,
-          };
-        });
-        timerRef.current = setTimeout(() => {
-          setState((s) =>
-            s.phase === "EXIT_OCR_SCANNING"
-              ? { ...s, phase: "EXIT_PAYMENT" }
-              : s
-          );
-        }, 1000);
+    const nowIso = new Date().toISOString();
+    const entryIso = state.entryTime ? state.entryTime.toISOString() : nowIso;
+
+    let resData: CheckOutData = {
+      id: state.transactionId || "6f4b7564-613b-4b9a-993b-f00c3aa07d09",
+      card_number: STATIC_CARD_NUMBER,
+      balance_before: 330000,
+      balance_after: 320000,
+      check_in_at: entryIso,
+      check_out_at: nowIso,
+      duration_minutes: 7,
+      amount: 10000,
+      status: "completed",
+    };
+
+    try {
+      const res = await demoService.checkOut({ card_number: STATIC_CARD_NUMBER });
+      if (res && res.data) {
+        resData = res.data;
       }
-    }, 100);
-  }, []);
+    } catch (err: any) {
+      console.warn("Check-out API fallback to default mock response:", err?.message);
+    }
 
-  // Called when user clicks "Pay & Open Gate"
+    setState((s) => ({
+      ...s,
+      isApiLoading: false,
+      phase: "EXIT_PAYMENT",
+      checkOutData: resData,
+      exitTime: new Date(resData.check_out_at),
+    }));
+  }, [state.entryTime, state.transactionId]);
+
   const confirmPayment = useCallback(() => {
-    setState((s) => {
-      if (s.phase !== "EXIT_PAYMENT") return s;
-      return { ...s, phase: "EXIT_GATE_OPEN", exitGateOpen: true };
-    });
+    setState((s) => ({ ...s, exitGateOpen: true, phase: "EXIT_GATE_OPEN" }));
+    timerRef.current = setTimeout(() => {
+      setState((s) => ({ ...s, exitGateOpen: false, phase: "COMPLETED" }));
+    }, 3000);
   }, []);
 
-  // Called when car has fully passed exit gate
   const onCarPassedExitGate = useCallback(() => {
-    setState((s) => {
-      if (s.phase !== "EXIT_GATE_OPEN") return s;
-      return { ...s, phase: "COMPLETED", exitGateOpen: false };
-    });
-    clearTimer();
+    setState((s) => ({ ...s, exitGateOpen: false, phase: "COMPLETED" }));
   }, []);
 
-  // Reset everything
   const resetSimulation = useCallback(() => {
-    clearTimer();
+    if (timerRef.current) clearTimeout(timerRef.current);
     setState({
       phase: "IDLE",
-      plateNumber: PLATE,
+      plateNumber: STATIC_VEHICLE_PLATE,
+      cardNumber: STATIC_CARD_NUMBER,
+      customerName: "Static Demo Account",
+      vehicleTypeId: STATIC_VEHICLE_TYPE_ID,
+      transactionId: null,
       entryTime: null,
       exitTime: null,
-      ocrResult: null,
-      ocrProgress: 0,
-      ocrConfidence: 0,
-      parkingFee: 0,
-      duration: "",
       entryGateOpen: false,
       exitGateOpen: false,
+      apiError: null,
+      apiSuccessMessage: null,
+      isApiLoading: false,
+      checkInData: null,
+      checkOutData: null,
     });
   }, []);
 
   return {
     state,
     triggerEntryOcr,
+    closeEntryModal,
     onCarPassedEntryGate,
     triggerExitOcr,
     confirmPayment,

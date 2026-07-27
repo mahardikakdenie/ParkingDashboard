@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/api-client';
 import {
   CreateTopupDto,
+  CreateTopupResponse,
   DetailTopupResponse,
   ListTopupResponse,
   BaseQueryParams,
@@ -16,6 +17,6 @@ export const topupsService = {
   },
 
   create(data: CreateTopupDto) {
-    return apiClient.post<null>('/topups', data);
+    return apiClient.post<CreateTopupResponse>('/topups', data);
   },
 };
