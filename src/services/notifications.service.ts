@@ -1,3 +1,4 @@
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { apiClient, getAuthToken } from '@/lib/api-client';
 import {
   ListNotificationQueryParams,
@@ -27,31 +28,56 @@ export const notificationsService = {
 
   subscribeStream(
     onMessage: (notification: NotificationItem) => void,
-    onError?: (error: Event) => void
+    onError?: (error: any) => void
   ): () => void {
     if (typeof window === 'undefined') return () => {};
 
+    const ctrl = new AbortController();
     const token = getAuthToken();
-    const streamUrl = `${BASE_URL}/notifications/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const eventSource = new EventSource(streamUrl, { withCredentials: true });
+    const streamUrl = `${BASE_URL}/notifications/stream`;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data: NotificationItem = JSON.parse(event.data);
-        onMessage(data);
-      } catch (err) {
-        console.error('Failed to parse SSE notification payload:', err);
-      }
+    const headers: Record<string, string> = {
+      'Accept': 'text/event-stream',
     };
 
-    if (onError) {
-      eventSource.onerror = (err) => {
-        onError(err);
-      };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
+    fetchEventSource(streamUrl, {
+      method: 'GET',
+      headers,
+      signal: ctrl.signal,
+      async onopen(response) {
+        if (response.ok && response.headers.get('content-type')?.includes('text/event-stream')) {
+          return; // Connection successfully established
+        } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          throw new Error(`Fatal SSE connection error with status: ${response.status}`);
+        }
+      },
+      onmessage(event) {
+        if (!event.data) return;
+        try {
+          const data: NotificationItem = JSON.parse(event.data);
+          onMessage(data);
+        } catch (err) {
+          console.error('Failed to parse SSE notification payload:', err);
+        }
+      },
+      onerror(err) {
+        console.warn('SSE notification stream error:', err);
+        if (onError) {
+          onError(err);
+        }
+      },
+    }).catch((err) => {
+      // Prevent unhandled promise rejection when signal aborted
+      if (ctrl.signal.aborted) return;
+      console.error('SSE fetchEventSource connection error:', err);
+    });
+
     return () => {
-      eventSource.close();
+      ctrl.abort();
     };
   },
 };
