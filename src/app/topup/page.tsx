@@ -478,8 +478,22 @@ export default function TopupPage() {
       header: "Gateway Link",
       render: (t) => {
         const isOnline = ["qris", "va", "transfer"].includes((t.method || "").toLowerCase());
+        const status = (t.status || "pending").toLowerCase();
         const isRowLoading = loadingRowId === t.id;
-        return isOnline ? (
+
+        if (!isOnline) {
+          return <span className="text-[10px] text-slate-500 italic">Direct Cash</span>;
+        }
+
+        if (status !== "pending") {
+          return (
+            <span className="text-[10px] text-slate-500 italic font-medium">
+              Link Unavailable
+            </span>
+          );
+        }
+
+        return (
           <button
             onClick={() => handlePayWebhookClick(t)}
             disabled={loadingRowId !== null}
@@ -492,8 +506,6 @@ export default function TopupPage() {
             )}
             <span>{isRowLoading ? "Hitting API..." : "Pay / Webhook"}</span>
           </button>
-        ) : (
-          <span className="text-[10px] text-slate-500 italic">Direct Cash</span>
         );
       },
     },
