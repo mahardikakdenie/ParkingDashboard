@@ -22,7 +22,7 @@ import {
 import { topupsService } from "@/services/topups.service";
 import { customersService } from "@/services/customers.service";
 import { paymentGatewayService } from "@/services/payment-gateway.service";
-import { TopupItem, CustomerItem, TopupMethod, CreateTopupResponse, TopupMetadata } from "@/types/api";
+import { TopupItem, CustomerItem, TopupMethod, CreateTopupResponse, TopupMetadata, PaginationMeta, CreateTopupDto } from "@/types/api";
 import { DataTable, Column } from "@/components/DataTable";
 
 const QUICK_AMOUNTS = [25000, 50000, 100000, 250000, 500000];
@@ -31,6 +31,13 @@ export default function TopupPage() {
   const [items, setItems] = useState<TopupItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<PaginationMeta>({
+    page: 1,
+    total_data: 0,
+    total_pages: 1,
+    total_per_page: 10,
+  });
 
   // Topup Creation Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,11 +47,13 @@ export default function TopupPage() {
     amount: number;
     method: TopupMethod;
     notes: string;
+    bank: string;
   }>({
     customer_id: "",
     amount: 50000,
     method: "qris",
     notes: "",
+    bank: "bca",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +68,6 @@ export default function TopupPage() {
     method: TopupMethod;
     metadata?: TopupMetadata;
   } | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState<"qris" | "bca_va" | "mandiri_va">("qris");
   const [isProcessingWebhook, setIsProcessingWebhook] = useState(false);
   const [webhookResult, setWebhookResult] = useState<{
     success: boolean;
@@ -68,19 +76,24 @@ export default function TopupPage() {
   } | null>(null);
   const [copiedVa, setCopiedVa] = useState(false);
   const [copiedQrString, setCopiedQrString] = useState(false);
+  const [selectedActionIndex, setSelectedActionIndex] = useState<number>(0);
+  const [copiedActionUrl, setCopiedActionUrl] = useState<string | null>(null);
   const [loadingRowId, setLoadingRowId] = useState<string | null>(null);
 
   const fetchTopups = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await topupsService.getList({ page: 1, limit: 50, search });
+      const res = await topupsService.getList({ page, limit: meta.total_per_page || 10, search });
       setItems(res.items || []);
+      if (res.meta) {
+        setMeta(res.meta);
+      }
     } catch (err) {
       console.error("Failed to fetch topups", err);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [page, search, meta.total_per_page]);
 
   useEffect(() => {
     fetchTopups();
@@ -107,7 +120,14 @@ export default function TopupPage() {
     setError(null);
     try {
       const selectedCustomer = customers.find((c) => c.id === formData.customer_id);
-      const res: CreateTopupResponse = await topupsService.create(formData);
+      const payload: CreateTopupDto = {
+        customer_id: formData.customer_id,
+        amount: formData.amount,
+        method: formData.method,
+        notes: formData.notes,
+        ...(formData.method === "va" ? { bank: formData.bank || "bca" } : {}),
+      };
+      const res: CreateTopupResponse = await topupsService.create(payload);
 
       const topupId = res?.id || `TOP-${Date.now().toString().slice(-6)}`;
       const orderId = res?.metadata?.order_id || topupId;
@@ -143,13 +163,17 @@ export default function TopupPage() {
       // 1. Fetch complete detail of topup to get customer_id
       const detail = await topupsService.getDetail(item.id);
 
-      // 2. Trigger POST /topups to create fresh Midtrans transaction
-      const res: CreateTopupResponse = await topupsService.create({
+      const topupMethod = (detail.method as TopupMethod) || "qris";
+      const payload: CreateTopupDto = {
         customer_id: detail.customer_id,
         amount: detail.amount,
-        method: (detail.method as TopupMethod) || "qris",
-        notes: detail.notes || `Re-initiated topup for order reference ${detail.reference}`,
-      });
+        method: topupMethod,
+        notes: detail.notes || `Re-initiated topup for order reference ${detail.reference || detail.id}`,
+        ...(topupMethod === "va" ? { bank: (detail as any).bank || "bca" } : {}),
+      };
+
+      // 2. Trigger POST /topups to create fresh Midtrans transaction
+      const res: CreateTopupResponse = await topupsService.create(payload);
 
       const topupId = res?.id || item.id;
       const orderId = res?.metadata?.order_id || topupId;
@@ -165,7 +189,7 @@ export default function TopupPage() {
         transactionId,
         customerName: detail.customer_name || "Valued Member",
         amount: res?.amount || item.amount,
-        method: (detail.method as TopupMethod) || "qris",
+        method: topupMethod,
         metadata: res?.metadata,
       });
       setWebhookResult(null);
@@ -186,7 +210,7 @@ export default function TopupPage() {
       transaction_status: status,
       order_id: activePaymentTopup.orderId,
       gross_amount: activePaymentTopup.metadata?.gross_amount || activePaymentTopup.amount.toFixed(2),
-      payment_type: selectedChannel === "qris" ? "qris" : "bank_transfer",
+      payment_type: activePaymentTopup.method === "qris" ? "qris" : "bank_transfer",
       transaction_time: new Date().toISOString().replace("T", " ").substring(0, 19),
       fraud_status: "accept",
       status_code: status === "settlement" ? "200" : "407",
@@ -224,29 +248,46 @@ export default function TopupPage() {
     setTimeout(() => setCopiedQrString(false), 2000);
   };
 
-  // Extract Midtrans QR Code Image URL from actions list
+  const handleCopyActionUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedActionUrl(url);
+    setTimeout(() => setCopiedActionUrl(null), 2000);
+  };
+
+  // Extract selected Midtrans QR Code Image URL from actions list
   const getQrCodeImageUrl = (): string | null => {
-    if (!activePaymentTopup?.metadata?.actions) return null;
-    const qrAction = activePaymentTopup.metadata.actions.find(
+    const actions = activePaymentTopup?.metadata?.actions;
+    if (!actions || actions.length === 0) return null;
+    if (actions[selectedActionIndex] && actions[selectedActionIndex].url) {
+      return actions[selectedActionIndex].url;
+    }
+    const qrAction = actions.find(
       (a) => a.name === "generate-qr-code" || a.name === "generate-qr-code-v2"
     );
-    return qrAction ? qrAction.url : null;
+    return qrAction ? qrAction.url : actions[0].url;
   };
 
   // Stats Calculations
-  const totalVolume = items.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const successItems = items.filter((i) => (i.status || "").toLowerCase() === "success");
+  const totalVolume = successItems.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalCount = items.length;
-  const midtransCount = items.filter((i) => ["qris", "va", "transfer"].includes((i.method || "").toLowerCase())).length;
+  const expiredCount = items.filter((i) => (i.status || "").toLowerCase() === "expired").length;
 
   const columns: Column<TopupItem>[] = [
     {
       key: "reference",
       header: "Reference",
       render: (t) => (
-        <span className="font-mono text-emerald-400 font-bold text-xs flex items-center gap-1">
-          <Zap className="w-3 h-3 text-emerald-500" />
-          {t.reference || t.id}
-        </span>
+        t.reference ? (
+          <span className="font-mono text-emerald-400 font-bold text-xs flex items-center gap-1">
+            <Zap className="w-3 h-3 text-emerald-500 shrink-0" />
+            {t.reference}
+          </span>
+        ) : (
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-800/60 border border-slate-700/50 italic">
+            Direct / No Ref
+          </span>
+        )
       ),
     },
     {
@@ -288,6 +329,43 @@ export default function TopupPage() {
         return (
           <span className={`px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider ${badgeStyles[m] || badgeStyles.cash}`}>
             {labelMap[m] || t.method}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (t) => {
+        const s = (t.status || "pending").toLowerCase();
+        if (s === "success") {
+          return (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 w-fit">
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              Success
+            </span>
+          );
+        }
+        if (s === "expired") {
+          return (
+            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 w-fit">
+              <Clock className="w-3 h-3 text-amber-400" />
+              Expired
+            </span>
+          );
+        }
+        if (s === "failed" || s === "canceled") {
+          return (
+            <span className="px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 w-fit">
+              <XCircle className="w-3 h-3 text-rose-400" />
+              {s}
+            </span>
+          );
+        }
+        return (
+          <span className="px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 w-fit">
+            <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />
+            Pending
           </span>
         );
       },
@@ -370,7 +448,7 @@ export default function TopupPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-400">Total Topup Volume</p>
+            <p className="text-xs font-medium text-slate-400">Total Settled Volume</p>
             <p className="text-xl font-bold text-emerald-400 font-mono mt-1">
               Rp {totalVolume.toLocaleString("id-ID")}
             </p>
@@ -383,7 +461,7 @@ export default function TopupPage() {
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-xs font-medium text-slate-400">Total Transactions</p>
-            <p className="text-xl font-bold text-slate-100 font-mono mt-1">{totalCount}</p>
+            <p className="text-xl font-bold text-slate-100 font-mono mt-1">{meta.total_data || totalCount}</p>
           </div>
           <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <DollarSign className="w-5 h-5 text-blue-400" />
@@ -392,11 +470,11 @@ export default function TopupPage() {
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-slate-400">Midtrans Gateway Transactions</p>
-            <p className="text-xl font-bold text-purple-400 font-mono mt-1">{midtransCount}</p>
+            <p className="text-xs font-medium text-slate-400">Expired Transactions</p>
+            <p className="text-xl font-bold text-amber-400 font-mono mt-1">{expiredCount}</p>
           </div>
-          <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-            <ShieldCheck className="w-5 h-5 text-purple-400" />
+          <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
+            <ShieldCheck className="w-5 h-5 text-amber-400" />
           </div>
         </div>
       </div>
@@ -409,8 +487,18 @@ export default function TopupPage() {
         accentColor="emerald"
         search={{
           value: search,
-          onChange: (val) => setSearch(val),
+          onChange: (val) => {
+            setSearch(val);
+            setPage(1);
+          },
           placeholder: "Search customer name or reference...",
+        }}
+        pagination={{
+          currentPage: page,
+          totalPages: meta.total_pages || 1,
+          totalItems: meta.total_data || items.length,
+          itemsPerPage: meta.total_per_page || 10,
+          onPageChange: (newPage) => setPage(newPage),
         }}
         emptyState={{
           icon: Wallet,
@@ -485,8 +573,8 @@ export default function TopupPage() {
                       type="button"
                       onClick={() => setFormData({ ...formData, amount: amt })}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${formData.amount === amt
-                          ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
-                          : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+                        ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
+                        : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
                         }`}
                     >
                       +{amt / 1000}k
@@ -509,6 +597,22 @@ export default function TopupPage() {
                   <option value="transfer">Direct Bank Transfer</option>
                   <option value="cash">Direct Cash Deposit (Tunai Kasir)</option>
                 </select>
+                {formData.method === "va" && (
+                  <div className="mt-2">
+                    <label className="text-xs font-medium text-slate-300 block mb-1.5">Select Bank</label>
+                    <select
+                      value={formData.bank}
+                      onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="bca">BCA</option>
+                      <option value="mandiri">Mandiri</option>
+                      <option value="bni">BNI</option>
+                      <option value="bri">BRI</option>
+                      <option value="permata">Permata</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -548,7 +652,7 @@ export default function TopupPage() {
       {/* MIDTRANS CHECKOUT & WEBHOOK MODAL */}
       {activePaymentTopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
@@ -557,43 +661,93 @@ export default function TopupPage() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-white">Midtrans Payment Gateway</h2>
-                  <p className="text-[11px] text-slate-400">Sandbox / Staging Checkout & Webhook Integration</p>
+                  <p className="text-[11px] text-slate-400">Sandbox / Staging Checkout & Metadata Inspector</p>
                 </div>
               </div>
               <button
-                onClick={() => setActivePaymentTopup(null)}
+                onClick={() => {
+                  setActivePaymentTopup(null);
+                  setSelectedActionIndex(0);
+                }}
                 className="text-slate-400 hover:text-white text-xs p-1"
               >
                 ✕
               </button>
             </div>
 
-            {/* Order Summary Box */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2 font-mono text-xs">
-              <div className="flex justify-between text-slate-400">
+            {/* Order & Metadata Summary Grid */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
+              <div className="flex justify-between items-center text-slate-400">
                 <span>Order ID:</span>
                 <span className="text-emerald-400 font-bold">{activePaymentTopup.orderId}</span>
               </div>
+
               {activePaymentTopup.transactionId && (
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between items-center text-slate-400">
                   <span>Transaction ID:</span>
                   <span className="text-slate-300 text-[11px]">{activePaymentTopup.transactionId}</span>
                 </div>
               )}
-              <div className="flex justify-between text-slate-400">
+
+              {activePaymentTopup.metadata?.merchant_id && (
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Merchant ID:</span>
+                  <span className="text-blue-400 font-semibold">{activePaymentTopup.metadata.merchant_id}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-slate-400">
                 <span>Customer Name:</span>
                 <span className="text-slate-200">{activePaymentTopup.customerName}</span>
               </div>
-              {activePaymentTopup.metadata?.acquirer && (
-                <div className="flex justify-between text-slate-400">
-                  <span>Acquirer Provider:</span>
-                  <span className="text-purple-400 font-bold uppercase">{activePaymentTopup.metadata.acquirer}</span>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+                {activePaymentTopup.metadata?.payment_type && (
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Payment Type:</span>
+                    <span className="text-purple-400 font-bold uppercase">
+                      {activePaymentTopup.metadata.payment_type}
+                    </span>
+                  </div>
+                )}
+                {activePaymentTopup.metadata?.acquirer && (
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Acquirer Provider:</span>
+                    <span className="text-pink-400 font-bold uppercase">
+                      {activePaymentTopup.metadata.acquirer}
+                    </span>
+                  </div>
+                )}
+                {activePaymentTopup.metadata?.status_code && (
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Status Code & Msg:</span>
+                    <span className="text-amber-400 font-semibold">
+                      {activePaymentTopup.metadata.status_code} ({activePaymentTopup.metadata.status_message || "OK"})
+                    </span>
+                  </div>
+                )}
+                {activePaymentTopup.metadata?.fraud_status && (
+                  <div className="flex flex-col">
+                    <span className="text-slate-500">Fraud Status:</span>
+                    <span className="text-emerald-400 font-semibold uppercase">
+                      {activePaymentTopup.metadata.fraud_status}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {activePaymentTopup.metadata?.transaction_time && (
+                <div className="flex justify-between items-center text-slate-400 pt-1 text-[11px]">
+                  <span>Transaction Time:</span>
+                  <span className="text-slate-300">{activePaymentTopup.metadata.transaction_time}</span>
                 </div>
               )}
+
               <div className="flex justify-between text-slate-400 border-t border-slate-800/80 pt-2 text-sm">
-                <span className="font-sans font-semibold text-slate-300">Total Payment:</span>
+                <span className="font-sans font-semibold text-slate-300">Total Gross Amount:</span>
                 <span className="text-cyan-400 font-bold">
-                  Rp {activePaymentTopup.amount.toLocaleString("id-ID")}
+                  {activePaymentTopup.metadata?.currency || "IDR"} Rp{" "}
+                  {activePaymentTopup.amount.toLocaleString("id-ID")}
                 </span>
               </div>
             </div>
@@ -608,53 +762,17 @@ export default function TopupPage() {
               </div>
             )}
 
-            {/* Payment Channel Selection */}
-            <div>
-              <label className="text-xs font-medium text-slate-300 block mb-2">
-                Select Staging Channel:
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel("qris")}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs ${selectedChannel === "qris"
-                      ? "bg-purple-500/10 border-purple-500/50 text-purple-300"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                    }`}
-                >
-                  <QrCode className="w-5 h-5 text-purple-400" />
-                  <span className="font-semibold text-[11px]">QRIS</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel("bca_va")}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs ${selectedChannel === "bca_va"
-                      ? "bg-blue-500/10 border-blue-500/50 text-blue-300"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                    }`}
-                >
-                  <Building2 className="w-5 h-5 text-blue-400" />
-                  <span className="font-semibold text-[11px]">BCA VA</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedChannel("mandiri_va")}
-                  className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs ${selectedChannel === "mandiri_va"
-                      ? "bg-amber-500/10 border-amber-500/50 text-amber-300"
-                      : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
-                    }`}
-                >
-                  <CreditCard className="w-5 h-5 text-amber-400" />
-                  <span className="font-semibold text-[11px]">Mandiri VA</span>
-                </button>
-              </div>
+            {/* Match Payment Method Staging Indicator */}
+            <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-xs text-slate-300">
+              <span className="font-medium">Active Payment Method:</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                {activePaymentTopup.method}
+              </span>
             </div>
 
-            {/* Channel Interactive Instructions */}
+            {/* Direct Channel Interactive Instructions */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center space-y-3">
-              {selectedChannel === "qris" ? (
+              {activePaymentTopup.method === "qris" ? (
                 <>
                   <div className="p-3 bg-white rounded-xl shadow-lg border border-slate-700 flex flex-col items-center">
                     {qrImageUrl ? (
@@ -664,7 +782,7 @@ export default function TopupPage() {
                         className="w-44 h-44 object-contain"
                       />
                     ) : (
-                      /* Simulated Dynamic QR Code SVG Fallback */
+                      /* Fallback Simulated QR Code SVG */
                       <svg className="w-32 h-32 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
                         <rect x="10" y="10" width="25" height="25" />
                         <rect x="15" y="15" width="15" height="15" fill="white" />
@@ -691,7 +809,7 @@ export default function TopupPage() {
                     Scan with GoPay, OVO, ShopeePay, or any Mobile Banking QRIS.
                   </p>
 
-                  {/* QR String Copy Option if available */}
+                  {/* QR String Copy Option */}
                   {activePaymentTopup.metadata?.qr_string && (
                     <div className="w-full pt-1 border-t border-slate-800">
                       <button
@@ -712,15 +830,23 @@ export default function TopupPage() {
               ) : (
                 <div className="w-full space-y-2">
                   <p className="text-xs text-slate-400 text-left">
-                    {selectedChannel === "bca_va" ? "BCA Virtual Account Number:" : "Mandiri Bill Payment Code:"}
+                    {(activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
+                      ? "Mandiri Bill Payment Code:"
+                      : "BCA Virtual Account Number:"}
                   </p>
                   <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5">
                     <span className="font-mono font-bold text-amber-400 text-sm tracking-wider">
-                      {selectedChannel === "bca_va" ? "88012 99018 27101" : "70012 00192 88102"}
+                      {(activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
+                        ? "70012 00192 88102"
+                        : "88012 99018 27101"}
                     </span>
                     <button
                       onClick={() =>
-                        handleCopyVa(selectedChannel === "bca_va" ? "880129901827101" : "700120019288102")
+                        handleCopyVa(
+                          (activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
+                            ? "700120019288102"
+                            : "880129901827101"
+                        )
                       }
                       className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-colors"
                     >
@@ -732,12 +858,87 @@ export default function TopupPage() {
               )}
             </div>
 
+            {/* MIDTRANS API ACTIONS LIST (LOOPING actions[]) */}
+            {activePaymentTopup.metadata?.actions && activePaymentTopup.metadata.actions.length > 0 && (
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                  <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    Midtrans Action Endpoints ({activePaymentTopup.metadata.actions.length})
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">Looping metadata.actions[]</span>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {activePaymentTopup.metadata.actions.map((act, idx) => {
+                    const isSelected = selectedActionIndex === idx;
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1.5 ${isSelected
+                          ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {act.name}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-800 text-emerald-400">
+                              {act.method}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedActionIndex(idx)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors ${isSelected
+                              ? "bg-purple-600 text-white"
+                              : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                              }`}
+                          >
+                            {isSelected ? "Active Preview" : "Select Preview"}
+                          </button>
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 break-all bg-slate-950 p-2 rounded-lg border border-slate-800/80 flex items-center justify-between gap-2">
+                          <span className="truncate">{act.url}</span>
+                          <div className="flex items-center gap-1 shrink-0 font-sans">
+                            <a
+                              href={act.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded text-[10px] transition-colors"
+                            >
+                              Open URL
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyActionUrl(act.url)}
+                              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 transition-colors"
+                            >
+                              {copiedActionUrl === act.url ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                              <span>{copiedActionUrl === act.url ? "Copied" : "Copy"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Webhook Execution Result Feedback */}
             {webhookResult && (
               <div
                 className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${webhookResult.success
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                    : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                  : "bg-rose-500/10 border-rose-500/30 text-rose-300"
                   }`}
               >
                 {webhookResult.success ? (
@@ -788,7 +989,10 @@ export default function TopupPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActivePaymentTopup(null)}
+                  onClick={() => {
+                    setActivePaymentTopup(null);
+                    setSelectedActionIndex(0);
+                  }}
                   className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] rounded-xl transition-colors"
                 >
                   Close Drawer

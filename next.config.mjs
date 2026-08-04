@@ -9,6 +9,13 @@ const nextConfig = {
       },
     ],
   },
+  // Disable body size limit for API routes to support long-running SSE streams.
+  // Without this, Next.js may prematurely terminate large or streaming responses.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: undefined,
+    },
+  },
 };
 
 export default nextConfig;

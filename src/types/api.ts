@@ -105,6 +105,7 @@ export interface CreateTopupDto {
   amount: number;
   method?: TopupMethod;
   notes?: string;
+  bank?: string;
 }
 
 export interface CreateUserDto {
@@ -487,7 +488,7 @@ export interface TopupItem {
   amount: number;
   method: TopupMethod | string;
   status: string;
-  reference: string;
+  reference: string | null;
   created_at: string;
 }
 
@@ -746,6 +747,40 @@ export interface CreateTopupResponse {
   method: TopupMethod | string;
   status: string;
   metadata?: TopupMetadata;
+}
+
+// ==========================================
+// SSE Stream Event Envelope Contracts
+// ==========================================
+
+/**
+ * Represents the raw JSON envelope of every event received from
+ * the SSE `/notifications/stream` endpoint.
+ *
+ * - When `type` is `"notification"`, the `data` field contains the
+ *   actual notification payload (matching NotificationItem shape).
+ * - When `type` is `"heartbeat"`, the `data` field is the string `"ping"`.
+ */
+export interface SSEEventEnvelope {
+  type: 'notification' | 'heartbeat';
+  data: SSENotificationPayload | string;
+}
+
+/**
+ * The inner notification payload extracted from an SSE event envelope
+ * when `envelope.type === "notification"`.
+ *
+ * This is the shape of `envelope.data` for notification events.
+ * It does NOT include `id`, `is_read`, `created_at`, `updated_at`
+ * because those fields are managed by the REST API — the SSE stream
+ * only pushes real-time lightweight payloads.
+ */
+export interface SSENotificationPayload {
+  type: NotificationType;
+  title: string;
+  message: string;
+  reference_type?: string;
+  reference_id?: string;
 }
 
 
