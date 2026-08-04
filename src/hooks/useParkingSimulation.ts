@@ -71,11 +71,12 @@ export function useParkingSimulation() {
       };
     });
 
+    const startTime = Date.now();
     const nowIso = new Date().toISOString();
     let resData: CheckInData = {
       id: "28e6ebb9-d852-4472-9a1b-353b87e15cf1",
       card_number: STATIC_CARD_NUMBER,
-      balance: 330000,
+      balance: 2200000,
       vehicle_plate: STATIC_VEHICLE_PLATE,
       check_in_at: nowIso,
       status: "active",
@@ -95,14 +96,20 @@ export function useParkingSimulation() {
       console.warn("Check-in API fallback to default mock response:", err?.message);
     }
 
-    setState((s) => ({
-      ...s,
-      isApiLoading: false,
-      phase: "ENTRY_MODAL",
-      checkInData: resData,
-      transactionId: resData.id,
-      entryTime: new Date(resData.check_in_at),
-    }));
+    // Enforce 5-second minimum scanning animation time
+    const elapsed = Date.now() - startTime;
+    const remainingDelay = Math.max(0, 5000 - elapsed);
+
+    setTimeout(() => {
+      setState((s) => ({
+        ...s,
+        isApiLoading: false,
+        phase: "ENTRY_MODAL",
+        checkInData: resData,
+        transactionId: resData.id,
+        entryTime: new Date(resData.check_in_at),
+      }));
+    }, remainingDelay);
   }, []);
 
   const closeEntryModal = useCallback(() => {
@@ -137,11 +144,11 @@ export function useParkingSimulation() {
     let resData: CheckOutData = {
       id: state.transactionId || "6f4b7564-613b-4b9a-993b-f00c3aa07d09",
       card_number: STATIC_CARD_NUMBER,
-      balance_before: 330000,
-      balance_after: 320000,
+      balance_before: 2200000,
+      balance_after: 2190000,
       check_in_at: entryIso,
       check_out_at: nowIso,
-      duration_minutes: 7,
+      duration_minutes: 10,
       amount: 10000,
       status: "completed",
     };
