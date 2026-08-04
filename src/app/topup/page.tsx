@@ -21,7 +21,8 @@ import {
   ArrowUpDown,
   X,
   RotateCcw,
-  Search
+  Search,
+  Radio
 } from "lucide-react";
 import { topupsService } from "@/services/topups.service";
 import { customersService } from "@/services/customers.service";
@@ -37,6 +38,7 @@ import {
   ListTopupQueryParams
 } from "@/types/api";
 import { DataTable, Column } from "@/components/DataTable";
+import { RealLifeTopupSimulationModal } from "./components/RealLifeTopupSimulationModal";
 
 const QUICK_AMOUNTS = [25000, 50000, 100000, 250000, 500000];
 
@@ -62,6 +64,7 @@ export default function TopupPage() {
 
   // Topup Creation Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
   const [customers, setCustomers] = useState<CustomerItem[]>([]);
   const [formData, setFormData] = useState<{
     customer_id: string;
@@ -224,6 +227,33 @@ export default function TopupPage() {
       setError(err?.message || "Failed to process topup deposit");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSimulationSubmit = async (payload: CreateTopupDto) => {
+    try {
+      const res: CreateTopupResponse = await topupsService.create(payload);
+      const topupId = res?.id || `TOP-${Date.now().toString().slice(-6)}`;
+      const orderId = res?.metadata?.order_id || topupId;
+      const transactionId = res?.metadata?.transaction_id;
+
+      fetchTopups();
+
+      if (["qris", "va", "transfer"].includes(payload.method || "")) {
+        setActivePaymentTopup({
+          topupId,
+          orderId,
+          transactionId,
+          customerName: "John Doe",
+          amount: res?.amount || payload.amount,
+          method: payload.method || "qris",
+          metadata: res?.metadata,
+        });
+        setWebhookResult(null);
+      }
+    } catch (err: any) {
+      console.error("Simulation topup submission failed", err);
+      throw err;
     }
   };
 
@@ -493,47 +523,19 @@ export default function TopupPage() {
             <span>Refresh</span>
           </button>
           <button
+            onClick={() => setIsSimulationModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-linear-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white text-xs font-semibold shadow-lg shadow-purple-950/40 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+          >
+            <Radio className="w-4 h-4 animate-pulse text-cyan-300" />
+            <span>Simulasi Topup In Real life</span>
+          </button>
+          <button
             onClick={handleOpenModal}
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 flex items-center gap-2 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>New Topup Deposit</span>
           </button>
-        </div>
-      </div>
-
-      {/* Overview Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-400">Total Settled Volume</p>
-            <p className="text-xl font-bold text-emerald-400 font-mono mt-1">
-              Rp {totalVolume.toLocaleString("id-ID")}
-            </p>
-          </div>
-          <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
-          </div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-400">Total Transactions</p>
-            <p className="text-xl font-bold text-slate-100 font-mono mt-1">{meta.total_data || totalCount}</p>
-          </div>
-          <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-            <DollarSign className="w-5 h-5 text-blue-400" />
-          </div>
-        </div>
-
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-400">Expired Transactions</p>
-            <p className="text-xl font-bold text-amber-400 font-mono mt-1">{expiredCount}</p>
-          </div>
-          <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
-            <ShieldCheck className="w-5 h-5 text-amber-400" />
-          </div>
         </div>
       </div>
 
@@ -848,11 +850,10 @@ export default function TopupPage() {
                       key={amt}
                       type="button"
                       onClick={() => setFormData({ ...formData, amount: amt })}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${
-                        formData.amount === amt
-                          ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
-                          : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
-                      }`}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${formData.amount === amt
+                        ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
+                        : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+                        }`}
                     >
                       +{amt / 1000}k
                     </button>
@@ -1141,11 +1142,10 @@ export default function TopupPage() {
                     return (
                       <div
                         key={idx}
-                        className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1.5 ${
-                          isSelected
-                            ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
-                            : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
-                        }`}
+                        className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1.5 ${isSelected
+                          ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
+                          : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1159,11 +1159,10 @@ export default function TopupPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedActionIndex(idx)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors ${
-                              isSelected
-                                ? "bg-purple-600 text-white"
-                                : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                            }`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors ${isSelected
+                              ? "bg-purple-600 text-white"
+                              : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                              }`}
                           >
                             {isSelected ? "Active Preview" : "Select Preview"}
                           </button>
@@ -1203,11 +1202,10 @@ export default function TopupPage() {
 
             {webhookResult && (
               <div
-                className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
-                  webhookResult.success
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                    : "bg-rose-500/10 border-rose-500/30 text-rose-300"
-                }`}
+                className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${webhookResult.success
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                  : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                  }`}
               >
                 {webhookResult.success ? (
                   <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
@@ -1269,6 +1267,13 @@ export default function TopupPage() {
           </div>
         </div>
       )}
+
+      {/* REAL-LIFE NFC SIMULATION MODAL */}
+      <RealLifeTopupSimulationModal
+        isOpen={isSimulationModalOpen}
+        onClose={() => setIsSimulationModalOpen(false)}
+        onSubmitSimulation={handleSimulationSubmit}
+      />
     </div>
   );
 }
