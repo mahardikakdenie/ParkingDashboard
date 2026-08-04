@@ -213,6 +213,8 @@ export interface DetailTopupResponse {
   status: string;
   reference: string;
   notes: string;
+  meta?: TopupMetadata;
+  metadata?: TopupMetadata;
   created_at: string;
 }
 
@@ -305,6 +307,15 @@ export interface ListPermissionResponse {
 export interface ListRoleResponse {
   items: RoleItem[];
   meta: PaginationMeta;
+}
+
+export interface ListTopupQueryParams extends Omit<BaseQueryParams, 'status'> {
+  method?: TopupMethod | string;
+  status?: 'pending' | 'success' | 'failed' | 'expired' | string;
+  orderBy?: 'id' | 'customer_name' | 'amount' | 'method' | 'status' | 'reference' | 'created_at' | string;
+  sort?: 'asc' | 'desc';
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface ListTopupResponse {

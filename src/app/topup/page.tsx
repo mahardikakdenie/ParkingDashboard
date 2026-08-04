@@ -6,8 +6,6 @@ import {
   RefreshCw,
   Wallet,
   CreditCard,
-  QrCode,
-  Building2,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -17,12 +15,27 @@ import {
   TrendingUp,
   DollarSign,
   ShieldCheck,
-  Clock
+  Clock,
+  Filter,
+  Calendar,
+  ArrowUpDown,
+  X,
+  RotateCcw,
+  Search
 } from "lucide-react";
 import { topupsService } from "@/services/topups.service";
 import { customersService } from "@/services/customers.service";
 import { paymentGatewayService } from "@/services/payment-gateway.service";
-import { TopupItem, CustomerItem, TopupMethod, CreateTopupResponse, TopupMetadata, PaginationMeta, CreateTopupDto } from "@/types/api";
+import {
+  TopupItem,
+  CustomerItem,
+  TopupMethod,
+  CreateTopupResponse,
+  TopupMetadata,
+  PaginationMeta,
+  CreateTopupDto,
+  ListTopupQueryParams
+} from "@/types/api";
 import { DataTable, Column } from "@/components/DataTable";
 
 const QUICK_AMOUNTS = [25000, 50000, 100000, 250000, 500000];
@@ -38,6 +51,14 @@ export default function TopupPage() {
     total_pages: 1,
     total_per_page: 10,
   });
+
+  // Filter States (Integrated with OpenAPI TopupController_getList_v1)
+  const [selectedMethod, setSelectedMethod] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [orderBy, setOrderBy] = useState<string>("created_at");
+  const [sort, setSort] = useState<"asc" | "desc">("desc");
 
   // Topup Creation Form State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,7 +104,18 @@ export default function TopupPage() {
   const fetchTopups = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await topupsService.getList({ page, limit: meta.total_per_page || 10, search });
+      const params: ListTopupQueryParams = {
+        page,
+        limit: meta.total_per_page || 10,
+        search: search.trim() || undefined,
+        method: selectedMethod || undefined,
+        status: selectedStatus || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        orderBy: orderBy || undefined,
+        sort: sort || undefined,
+      };
+      const res = await topupsService.getList(params);
       setItems(res.items || []);
       if (res.meta) {
         setMeta(res.meta);
@@ -93,11 +125,50 @@ export default function TopupPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, meta.total_per_page]);
+  }, [page, search, selectedMethod, selectedStatus, startDate, endDate, orderBy, sort, meta.total_per_page]);
 
   useEffect(() => {
     fetchTopups();
   }, [fetchTopups]);
+
+  const handleResetFilters = () => {
+    setSearch("");
+    setSelectedMethod("");
+    setSelectedStatus("");
+    setStartDate("");
+    setEndDate("");
+    setOrderBy("created_at");
+    setSort("desc");
+    setPage(1);
+  };
+
+  const handleQuickDatePreset = (days: number) => {
+    const end = new Date();
+    const start = new Date();
+    if (days === 0) {
+      // Today
+      const todayStr = start.toISOString().split("T")[0];
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else {
+      start.setDate(start.getDate() - days);
+      setStartDate(start.toISOString().split("T")[0]);
+      setEndDate(end.toISOString().split("T")[0]);
+    }
+    setPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    search || selectedMethod || selectedStatus || startDate || endDate || orderBy !== "created_at" || sort !== "desc"
+  );
+
+  const activeFilterCount = [
+    Boolean(search),
+    Boolean(selectedMethod),
+    Boolean(selectedStatus),
+    Boolean(startDate || endDate),
+    orderBy !== "created_at" || sort !== "desc"
+  ].filter(Boolean).length;
 
   const handleOpenModal = async () => {
     setError(null);
@@ -136,7 +207,6 @@ export default function TopupPage() {
       setIsModalOpen(false);
       fetchTopups();
 
-      // Open Midtrans Payment Modal with exact backend response metadata
       if (["qris", "va", "transfer"].includes(formData.method)) {
         setActivePaymentTopup({
           topupId,
@@ -160,42 +230,31 @@ export default function TopupPage() {
   const handlePayWebhookClick = async (item: TopupItem) => {
     setLoadingRowId(item.id);
     try {
-      // 1. Fetch complete detail of topup to get customer_id
+      // Fetch existing topup detail from GET /api/v1/topups/detail/:id
       const detail = await topupsService.getDetail(item.id);
 
+      // Extract metadata from detail response (support both meta and metadata keys)
+      const metadata: TopupMetadata | undefined = detail.meta || (detail as any).metadata;
       const topupMethod = (detail.method as TopupMethod) || "qris";
-      const payload: CreateTopupDto = {
-        customer_id: detail.customer_id,
-        amount: detail.amount,
-        method: topupMethod,
-        notes: detail.notes || `Re-initiated topup for order reference ${detail.reference || detail.id}`,
-        ...(topupMethod === "va" ? { bank: (detail as any).bank || "bca" } : {}),
-      };
 
-      // 2. Trigger POST /topups to create fresh Midtrans transaction
-      const res: CreateTopupResponse = await topupsService.create(payload);
+      const topupId = detail.id || item.id;
+      const orderId = metadata?.order_id || detail.reference || topupId;
+      const transactionId = metadata?.transaction_id;
 
-      const topupId = res?.id || item.id;
-      const orderId = res?.metadata?.order_id || topupId;
-      const transactionId = res?.metadata?.transaction_id;
-
-      // Refresh table to list the newly triggered topup record
-      fetchTopups();
-
-      // 3. Open checkout modal with fresh payment gateway actions/metadata
+      // Open checkout inspection modal with existing record data
       setActivePaymentTopup({
         topupId,
         orderId,
         transactionId,
         customerName: detail.customer_name || "Valued Member",
-        amount: res?.amount || item.amount,
+        amount: detail.amount || item.amount,
         method: topupMethod,
-        metadata: res?.metadata,
+        metadata: metadata,
       });
       setWebhookResult(null);
     } catch (err: any) {
-      console.error("Failed to re-trigger topup payment gateway", err);
-      alert(err?.message || "Failed to trigger payment gateway for this topup record.");
+      console.error("Failed to fetch topup detail", err);
+      alert(err?.message || "Failed to load payment detail for this topup record.");
     } finally {
       setLoadingRowId(null);
     }
@@ -254,7 +313,6 @@ export default function TopupPage() {
     setTimeout(() => setCopiedActionUrl(null), 2000);
   };
 
-  // Extract selected Midtrans QR Code Image URL from actions list
   const getQrCodeImageUrl = (): string | null => {
     const actions = activePaymentTopup?.metadata?.actions;
     if (!actions || actions.length === 0) return null;
@@ -267,7 +325,7 @@ export default function TopupPage() {
     return qrAction ? qrAction.url : actions[0].url;
   };
 
-  // Stats Calculations
+  // Overview Stats
   const successItems = items.filter((i) => (i.status || "").toLowerCase() === "success");
   const totalVolume = successItems.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const totalCount = items.length;
@@ -479,20 +537,237 @@ export default function TopupPage() {
         </div>
       </div>
 
+      {/* UI FILTER CONTAINER (OpenAPI TopupController_getList_v1 Integration) */}
+      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 backdrop-blur-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 text-emerald-400">
+              <Filter className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>Filter & Sort Topup Transactions</span>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
+                    {activeFilterCount} Active
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Filter by payment method, transaction status, date range, or sort field.
+              </p>
+            </div>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+              <span>Reset All Filters</span>
+            </button>
+          )}
+        </div>
+
+        {/* Filter Inputs Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* Search Query */}
+          <div className="space-y-1 xl:col-span-2">
+            <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+              <Search className="w-3 h-3" /> Search Text
+            </label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Customer name or reference..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+              <CreditCard className="w-3 h-3" /> Method
+            </label>
+            <select
+              value={selectedMethod}
+              onChange={(e) => {
+                setSelectedMethod(e.target.value);
+                setPage(1);
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">All Payment Methods</option>
+              <option value="qris">MIDTRANS QRIS</option>
+              <option value="va">MIDTRANS VA</option>
+              <option value="transfer">BANK TRANSFER</option>
+              <option value="cash">CASH DEPOSIT</option>
+            </select>
+          </div>
+
+          {/* Status */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> Status
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setPage(1);
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="success">Success</option>
+              <option value="failed">Failed</option>
+              <option value="expired">Expired</option>
+            </select>
+          </div>
+
+          {/* Order By */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+              <ArrowUpDown className="w-3 h-3" /> Order By
+            </label>
+            <select
+              value={orderBy}
+              onChange={(e) => {
+                setOrderBy(e.target.value);
+                setPage(1);
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="created_at">Created Date</option>
+              <option value="amount">Amount</option>
+              <option value="customer_name">Customer Name</option>
+              <option value="status">Status</option>
+              <option value="reference">Reference</option>
+              <option value="method">Method</option>
+            </select>
+          </div>
+
+          {/* Sort Direction */}
+          <div className="space-y-1">
+            <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+              <ArrowUpDown className="w-3 h-3" /> Direction
+            </label>
+            <select
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value as "asc" | "desc");
+                setPage(1);
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+            >
+              <option value="desc">Descending (Newest / High)</option>
+              <option value="asc">Ascending (Oldest / Low)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Date Range Sub-Row & Quick Presets */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="text-[11px] font-medium text-slate-400">Date Range:</span>
+            </div>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1);
+              }}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+            />
+            <span className="text-slate-500 text-xs">to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Quick Date Range Preset Buttons */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500 font-mono mr-1">Quick:</span>
+            <button
+              onClick={() => handleQuickDatePreset(0)}
+              className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 text-[11px] border border-slate-800 transition-colors"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => handleQuickDatePreset(7)}
+              className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 text-[11px] border border-slate-800 transition-colors"
+            >
+              Last 7 Days
+            </button>
+            <button
+              onClick={() => handleQuickDatePreset(30)}
+              className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 text-[11px] border border-slate-800 transition-colors"
+            >
+              Last 30 Days
+            </button>
+          </div>
+        </div>
+
+        {/* Active Filter Chips */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/60">
+            <span className="text-[10px] font-mono text-slate-500 mr-1">Active Chips:</span>
+            {search && (
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] flex items-center gap-1.5">
+                <span>Search: &quot;{search}&quot;</span>
+                <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => setSearch("")} />
+              </span>
+            )}
+            {selectedMethod && (
+              <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[11px] flex items-center gap-1.5 uppercase font-mono">
+                <span>Method: {selectedMethod}</span>
+                <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => setSelectedMethod("")} />
+              </span>
+            )}
+            {selectedStatus && (
+              <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] flex items-center gap-1.5 uppercase font-mono">
+                <span>Status: {selectedStatus}</span>
+                <X className="w-3 h-3 cursor-pointer hover:text-white" onClick={() => setSelectedStatus("")} />
+              </span>
+            )}
+            {(startDate || endDate) && (
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] flex items-center gap-1.5 font-mono">
+                <span>Date: {startDate || "Start"} → {endDate || "Now"}</span>
+                <X
+                  className="w-3 h-3 cursor-pointer hover:text-white"
+                  onClick={() => {
+                    setStartDate("");
+                    setEndDate("");
+                  }}
+                />
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Main Data Table */}
       <DataTable
         columns={columns}
         data={items}
         loading={loading}
         accentColor="emerald"
-        search={{
-          value: search,
-          onChange: (val) => {
-            setSearch(val);
-            setPage(1);
-          },
-          placeholder: "Search customer name or reference...",
-        }}
         pagination={{
           currentPage: page,
           totalPages: meta.total_pages || 1,
@@ -502,10 +777,12 @@ export default function TopupPage() {
         }}
         emptyState={{
           icon: Wallet,
-          title: "Belum Ada Riwayat Topup",
-          description: "Belum ada transaksi deposit saldo member yang tercatat.",
-          actionLabel: "Deposit Saldo Baru",
-          onAction: () => handleOpenModal(),
+          title: "Belum Ada Data Topup",
+          description: hasActiveFilters
+            ? "Tidak ada data topup yang cocok dengan filter yang dipilih."
+            : "Belum ada transaksi deposit saldo member yang tercatat.",
+          actionLabel: hasActiveFilters ? "Reset Filter" : "Deposit Saldo Baru",
+          onAction: () => (hasActiveFilters ? handleResetFilters() : handleOpenModal()),
         }}
       />
 
@@ -565,17 +842,17 @@ export default function TopupPage() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                 />
 
-                {/* Quick Amount Pills */}
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {QUICK_AMOUNTS.map((amt) => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setFormData({ ...formData, amount: amt })}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${formData.amount === amt
-                        ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
-                        : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
-                        }`}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${
+                        formData.amount === amt
+                          ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
+                          : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+                      }`}
                     >
                       +{amt / 1000}k
                     </button>
@@ -653,7 +930,6 @@ export default function TopupPage() {
       {activePaymentTopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200 overflow-y-auto max-h-[90vh]">
-            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-blue-500/10 rounded-xl border border-blue-500/20 text-blue-400">
@@ -675,7 +951,6 @@ export default function TopupPage() {
               </button>
             </div>
 
-            {/* Order & Metadata Summary Grid */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2.5 font-mono text-xs">
               <div className="flex justify-between items-center text-slate-400">
                 <span>Order ID:</span>
@@ -752,7 +1027,6 @@ export default function TopupPage() {
               </div>
             </div>
 
-            {/* Expiry Badge if available */}
             {activePaymentTopup.metadata?.expiry_time && (
               <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 px-3.5 py-2 rounded-xl text-xs text-amber-400 font-mono animate-pulse">
                 <span className="flex items-center gap-1.5">
@@ -762,7 +1036,6 @@ export default function TopupPage() {
               </div>
             )}
 
-            {/* Match Payment Method Staging Indicator */}
             <div className="flex items-center justify-between bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-xs text-slate-300">
               <span className="font-medium">Active Payment Method:</span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
@@ -770,7 +1043,6 @@ export default function TopupPage() {
               </span>
             </div>
 
-            {/* Direct Channel Interactive Instructions */}
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center space-y-3">
               {activePaymentTopup.method === "qris" ? (
                 <>
@@ -782,20 +1054,16 @@ export default function TopupPage() {
                         className="w-44 h-44 object-contain"
                       />
                     ) : (
-                      /* Fallback Simulated QR Code SVG */
                       <svg className="w-32 h-32 text-slate-900" viewBox="0 0 100 100" fill="currentColor">
                         <rect x="10" y="10" width="25" height="25" />
                         <rect x="15" y="15" width="15" height="15" fill="white" />
                         <rect x="18" y="18" width="9" height="9" />
-
                         <rect x="65" y="10" width="25" height="25" />
                         <rect x="70" y="15" width="15" height="15" fill="white" />
                         <rect x="73" y="18" width="9" height="9" />
-
                         <rect x="10" y="65" width="25" height="25" />
                         <rect x="15" y="70" width="15" height="15" fill="white" />
                         <rect x="18" y="73" width="9" height="9" />
-
                         <rect x="40" y="15" width="10" height="10" />
                         <rect x="45" y="30" width="15" height="15" />
                         <rect x="65" y="45" width="10" height="20" />
@@ -809,7 +1077,6 @@ export default function TopupPage() {
                     Scan with GoPay, OVO, ShopeePay, or any Mobile Banking QRIS.
                   </p>
 
-                  {/* QR String Copy Option */}
                   {activePaymentTopup.metadata?.qr_string && (
                     <div className="w-full pt-1 border-t border-slate-800">
                       <button
@@ -858,7 +1125,6 @@ export default function TopupPage() {
               )}
             </div>
 
-            {/* MIDTRANS API ACTIONS LIST (LOOPING actions[]) */}
             {activePaymentTopup.metadata?.actions && activePaymentTopup.metadata.actions.length > 0 && (
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
@@ -875,10 +1141,11 @@ export default function TopupPage() {
                     return (
                       <div
                         key={idx}
-                        className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1.5 ${isSelected
-                          ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
-                          : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
-                          }`}
+                        className={`p-2.5 rounded-xl border transition-all text-xs font-mono space-y-1.5 ${
+                          isSelected
+                            ? "bg-purple-500/10 border-purple-500/40 text-purple-200"
+                            : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700"
+                        }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -892,10 +1159,11 @@ export default function TopupPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedActionIndex(idx)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors ${isSelected
-                              ? "bg-purple-600 text-white"
-                              : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                              }`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors ${
+                              isSelected
+                                ? "bg-purple-600 text-white"
+                                : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            }`}
                           >
                             {isSelected ? "Active Preview" : "Select Preview"}
                           </button>
@@ -933,13 +1201,13 @@ export default function TopupPage() {
               </div>
             )}
 
-            {/* Webhook Execution Result Feedback */}
             {webhookResult && (
               <div
-                className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${webhookResult.success
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                  : "bg-rose-500/10 border-rose-500/30 text-rose-300"
-                  }`}
+                className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  webhookResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    : "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                }`}
               >
                 {webhookResult.success ? (
                   <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
@@ -957,7 +1225,6 @@ export default function TopupPage() {
               </div>
             )}
 
-            {/* Actions: Trigger Webhook Endpoint */}
             <div className="space-y-2 pt-2 border-t border-slate-800">
               <button
                 type="button"

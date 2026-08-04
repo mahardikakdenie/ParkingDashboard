@@ -4,11 +4,11 @@ import {
   CreateTopupResponse,
   DetailTopupResponse,
   ListTopupResponse,
-  BaseQueryParams,
+  ListTopupQueryParams,
 } from '@/types/api';
 
 export const topupsService = {
-  getList(params: BaseQueryParams) {
+  getList(params?: ListTopupQueryParams) {
     return apiClient.get<ListTopupResponse>('/topups/list', params);
   },
 
