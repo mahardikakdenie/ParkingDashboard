@@ -728,6 +728,19 @@ export interface PaymentWebhookResponse {
   processed_at: string;
 }
 
+export interface TopupVaNumber {
+  bank: string;
+  va_number: string;
+}
+
+export interface TopupCustomerDetails {
+  email?: string;
+  phone?: string;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 export interface TopupMetadataAction {
   name: string;
   method: string;
@@ -750,6 +763,13 @@ export interface TopupMetadata {
   acquirer?: string;
   qr_string?: string;
   expiry_time?: string;
+  va_numbers?: TopupVaNumber[];
+  permata_va_number?: string;
+  biller_code?: string;
+  bill_key?: string;
+  signature_key?: string;
+  customer_details?: TopupCustomerDetails;
+  payment_amounts?: any[];
 }
 
 export interface CreateTopupResponse {
@@ -793,5 +813,53 @@ export interface SSENotificationPayload {
   reference_type?: string;
   reference_id?: string;
 }
+
+export interface BankOption {
+  id: string;
+  code: string;
+  name: string;
+  logo?: string;
+  status?: number;
+}
+
+export interface PaymentMethodOption {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  banks?: BankOption[];
+  is_active?: boolean;
+}
+
+export interface BankItem {
+  id: string;
+  code: string;
+  name: string;
+  status?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PaymentMethodItem {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  banks?: BankItem[];
+  status?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ListBankResponse {
+  items: BankItem[];
+  meta?: PaginationMeta;
+}
+
+export interface ListPaymentMethodResponse {
+  items: PaymentMethodItem[];
+  meta?: PaginationMeta;
+}
+
 
 

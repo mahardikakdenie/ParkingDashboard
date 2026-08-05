@@ -15,3 +15,5 @@ export * from './health-cron.service';
 export * from './notifications.service';
 export * from './demo.service';
 export * from './payment-gateway.service';
+export * from './payment-methods.service';
+

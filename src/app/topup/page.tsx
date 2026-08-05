@@ -27,6 +27,7 @@ import {
 import { topupsService } from "@/services/topups.service";
 import { customersService } from "@/services/customers.service";
 import { paymentGatewayService } from "@/services/payment-gateway.service";
+import { paymentMethodsService } from "@/services/payment-methods.service";
 import {
   TopupItem,
   CustomerItem,
@@ -35,7 +36,8 @@ import {
   TopupMetadata,
   PaginationMeta,
   CreateTopupDto,
-  ListTopupQueryParams
+  ListTopupQueryParams,
+  PaymentMethodOption,
 } from "@/types/api";
 import { DataTable, Column } from "@/components/DataTable";
 import { RealLifeTopupSimulationModal } from "./components/RealLifeTopupSimulationModal";
@@ -81,17 +83,23 @@ export default function TopupPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<PaymentMethodOption[]>([]);
 
   // Midtrans Payment Gateway Modal State
   const [activePaymentTopup, setActivePaymentTopup] = useState<{
     topupId: string;
     orderId: string;
     transactionId?: string;
+    reference?: string;
     customerName: string;
     amount: number;
-    method: TopupMethod;
+    method: TopupMethod | string;
     metadata?: TopupMetadata;
+    status?: string;
+    notes?: string;
+    created_at?: string;
   } | null>(null);
+  const [copiedVaIndex, setCopiedVaIndex] = useState<number | string | null>(null);
   const [isProcessingWebhook, setIsProcessingWebhook] = useState(false);
   const [webhookResult, setWebhookResult] = useState<{
     success: boolean;
@@ -176,15 +184,36 @@ export default function TopupPage() {
   const handleOpenModal = async () => {
     setError(null);
     try {
-      const res = await customersService.getList({ page: 1, limit: 100 });
-      const customerList = res.items || [];
-      setCustomers(customerList);
-      if (customerList.length > 0) {
-        setFormData((prev) => ({ ...prev, customer_id: customerList[0].id }));
+      const [customerRes, optionsRes] = await Promise.allSettled([
+        customersService.getList({ page: 1, limit: 100 }),
+        paymentMethodsService.getOptions(),
+      ]);
+
+      if (customerRes.status === "fulfilled") {
+        const customerList = customerRes.value.items || [];
+        setCustomers(customerList);
+        if (customerList.length > 0) {
+          setFormData((prev) => ({ ...prev, customer_id: customerList[0].id }));
+        }
       }
+
+      if (optionsRes.status === "fulfilled" && Array.isArray(optionsRes.value)) {
+        setPaymentMethodOptions(optionsRes.value);
+        if (optionsRes.value.length > 0) {
+          const firstMethod = optionsRes.value[0];
+          const firstBanks = firstMethod.banks || [];
+          setFormData((prev) => ({
+            ...prev,
+            method: (firstMethod.code || "qris") as TopupMethod,
+            bank: firstBanks.length > 0 ? firstBanks[0].code : "",
+          }));
+        }
+      }
+
       setIsModalOpen(true);
     } catch (err) {
-      console.error("Failed to fetch customers", err);
+      console.error("Failed to load topup modal data", err);
+      setIsModalOpen(true);
     }
   };
 
@@ -215,10 +244,14 @@ export default function TopupPage() {
           topupId,
           orderId,
           transactionId,
-          customerName: selectedCustomer?.name || "Valued Member",
+          reference: (res as any)?.reference || undefined,
+          customerName: selectedCustomer?.name || res?.metadata?.customer_details?.full_name || "Valued Member",
           amount: res?.amount || formData.amount,
           method: formData.method,
           metadata: res?.metadata,
+          status: res?.status || "pending",
+          notes: (res as any)?.notes || formData.notes,
+          created_at: (res as any)?.created_at || new Date().toISOString(),
         });
         setWebhookResult(null);
       }
@@ -244,10 +277,14 @@ export default function TopupPage() {
           topupId,
           orderId,
           transactionId,
-          customerName: "John Doe",
+          reference: (res as any)?.reference || undefined,
+          customerName: res?.metadata?.customer_details?.full_name || "John Doe",
           amount: res?.amount || payload.amount,
           method: payload.method || "qris",
           metadata: res?.metadata,
+          status: res?.status || "pending",
+          notes: (res as any)?.notes || payload.notes,
+          created_at: (res as any)?.created_at || new Date().toISOString(),
         });
         setWebhookResult(null);
       }
@@ -276,10 +313,14 @@ export default function TopupPage() {
         topupId,
         orderId,
         transactionId,
-        customerName: detail.customer_name || "Valued Member",
+        reference: detail.reference || item.reference || undefined,
+        customerName: detail.customer_name || metadata?.customer_details?.full_name || "Valued Member",
         amount: detail.amount || item.amount,
         method: topupMethod,
         metadata: metadata,
+        status: detail.status || item.status,
+        notes: detail.notes,
+        created_at: detail.created_at,
       });
       setWebhookResult(null);
     } catch (err: any) {
@@ -510,6 +551,12 @@ export default function TopupPage() {
       },
     },
   ];
+
+  const selectedMethodObj = paymentMethodOptions.find(
+    (pm) => pm.code === formData.method || pm.id === formData.method
+  );
+  const availableBanks = selectedMethodObj?.banks || [];
+  const hasBanks = availableBanks.length > 0;
 
   const qrImageUrl = getQrCodeImageUrl();
 
@@ -879,27 +926,56 @@ export default function TopupPage() {
                 </label>
                 <select
                   value={formData.method}
-                  onChange={(e) => setFormData({ ...formData, method: e.target.value as TopupMethod })}
+                  onChange={(e) => {
+                    const newMethod = e.target.value as TopupMethod;
+                    const targetObj = paymentMethodOptions.find(
+                      (pm) => pm.code === newMethod || pm.id === newMethod
+                    );
+                    const targetBanks = targetObj?.banks || [];
+                    setFormData((prev) => ({
+                      ...prev,
+                      method: newMethod,
+                      bank: targetBanks.length > 0 ? targetBanks[0].code : "",
+                    }));
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                 >
-                  <option value="qris">Midtrans QRIS Dynamic QR</option>
-                  <option value="va">Midtrans Virtual Account (BCA / Mandiri)</option>
-                  <option value="transfer">Direct Bank Transfer</option>
-                  <option value="cash">Direct Cash Deposit (Tunai Kasir)</option>
+                  {paymentMethodOptions.length > 0 ? (
+                    paymentMethodOptions.map((pm) => (
+                      <option key={pm.id || pm.code} value={pm.code}>
+                        {pm.name}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="qris">Midtrans QRIS Dynamic QR</option>
+                      <option value="va">Midtrans Virtual Account (BCA / Mandiri)</option>
+                      <option value="transfer">Direct Bank Transfer</option>
+                      <option value="cash">Direct Cash Deposit (Tunai Kasir)</option>
+                    </>
+                  )}
                 </select>
-                {formData.method === "va" && (
-                  <div className="mt-2">
-                    <label className="text-xs font-medium text-slate-300 block mb-1.5">Select Bank</label>
+
+                {hasBanks && (
+                  <div className="mt-3.5 space-y-1.5 animate-in fade-in duration-200">
+                    <label className="text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Select Bank</span>
+                      <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-bold">
+                        * Required
+                      </span>
+                    </label>
                     <select
+                      required
                       value={formData.bank}
-                      onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, bank: e.target.value }))}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="bca">BCA</option>
-                      <option value="mandiri">Mandiri</option>
-                      <option value="bni">BNI</option>
-                      <option value="bri">BRI</option>
-                      <option value="permata">Permata</option>
+                      <option value="" disabled>-- Select Bank --</option>
+                      {availableBanks.map((b) => (
+                        <option key={b.id || b.code} value={b.code}>
+                          {b.name} ({b.code.toUpperCase()})
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -970,6 +1046,13 @@ export default function TopupPage() {
                 <span className="text-emerald-400 font-bold">{activePaymentTopup.orderId}</span>
               </div>
 
+              {activePaymentTopup.reference && (
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>Reference:</span>
+                  <span className="text-cyan-400 font-bold text-xs">{activePaymentTopup.reference}</span>
+                </div>
+              )}
+
               {activePaymentTopup.transactionId && (
                 <div className="flex justify-between items-center text-slate-400">
                   <span>Transaction ID:</span>
@@ -988,6 +1071,23 @@ export default function TopupPage() {
                 <span>Customer Name:</span>
                 <span className="text-slate-200">{activePaymentTopup.customerName}</span>
               </div>
+
+              {activePaymentTopup.metadata?.customer_details && (
+                <>
+                  {activePaymentTopup.metadata.customer_details.email && (
+                    <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                      <span>Customer Email:</span>
+                      <span className="text-slate-300">{activePaymentTopup.metadata.customer_details.email}</span>
+                    </div>
+                  )}
+                  {activePaymentTopup.metadata.customer_details.phone && (
+                    <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                      <span>Customer Phone:</span>
+                      <span className="text-slate-300">{activePaymentTopup.metadata.customer_details.phone}</span>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
                 {activePaymentTopup.metadata?.payment_type && (
@@ -1108,32 +1208,86 @@ export default function TopupPage() {
                   )}
                 </>
               ) : (
-                <div className="w-full space-y-2">
-                  <p className="text-xs text-slate-400 text-left">
-                    {(activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
-                      ? "Mandiri Bill Payment Code:"
-                      : "BCA Virtual Account Number:"}
-                  </p>
-                  <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5">
-                    <span className="font-mono font-bold text-amber-400 text-sm tracking-wider">
-                      {(activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
-                        ? "70012 00192 88102"
-                        : "88012 99018 27101"}
-                    </span>
-                    <button
-                      onClick={() =>
-                        handleCopyVa(
-                          (activePaymentTopup.metadata?.acquirer || "").toLowerCase().includes("mandiri")
-                            ? "700120019288102"
-                            : "880129901827101"
-                        )
-                      }
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-colors"
-                    >
-                      {copiedVa ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedVa ? "Copied" : "Copy"}</span>
-                    </button>
-                  </div>
+                <div className="w-full space-y-3">
+                  {activePaymentTopup.metadata?.va_numbers && activePaymentTopup.metadata.va_numbers.length > 0 ? (
+                    activePaymentTopup.metadata.va_numbers.map((va, idx) => (
+                      <div key={idx} className="w-full space-y-1.5 text-left">
+                        <p className="text-xs text-slate-400 font-medium flex items-center justify-between">
+                          <span>{va.bank?.toUpperCase()} Virtual Account Number:</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            {va.bank?.toUpperCase()}
+                          </span>
+                        </p>
+                        <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                          <span className="font-mono font-bold text-amber-400 text-sm tracking-wider break-all">
+                            {va.va_number}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(va.va_number);
+                              setCopiedVaIndex(idx);
+                              setTimeout(() => setCopiedVaIndex(null), 2000);
+                            }}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-colors shrink-0 ml-2"
+                          >
+                            {copiedVaIndex === idx ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                            <span>{copiedVaIndex === idx ? "Copied" : "Copy"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : activePaymentTopup.metadata?.permata_va_number ? (
+                    <div className="w-full space-y-1.5 text-left">
+                      <p className="text-xs text-slate-400 font-medium">Permata Virtual Account Number:</p>
+                      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                        <span className="font-mono font-bold text-amber-400 text-sm tracking-wider break-all">
+                          {activePaymentTopup.metadata.permata_va_number}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(activePaymentTopup.metadata!.permata_va_number!);
+                            setCopiedVaIndex("permata");
+                            setTimeout(() => setCopiedVaIndex(null), 2000);
+                          }}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 transition-colors shrink-0 ml-2"
+                        >
+                          {copiedVaIndex === "permata" ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedVaIndex === "permata" ? "Copied" : "Copy"}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : activePaymentTopup.metadata?.biller_code ? (
+                    <div className="w-full space-y-2.5 text-left">
+                      <p className="text-xs text-slate-400 font-medium">Mandiri Bill Payment Details:</p>
+                      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono">
+                        <span className="text-slate-400">Biller Code:</span>
+                        <span className="text-amber-400 font-bold">{activePaymentTopup.metadata.biller_code}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono">
+                        <span className="text-slate-400">Bill Key:</span>
+                        <span className="text-amber-400 font-bold">{activePaymentTopup.metadata.bill_key}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full space-y-2 text-left">
+                      <p className="text-xs text-slate-400">Virtual Account Number:</p>
+                      <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5">
+                        <span className="font-mono font-bold text-amber-400 text-sm tracking-wider">
+                          {activePaymentTopup.reference || "VA-PENDING-GENERATION"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

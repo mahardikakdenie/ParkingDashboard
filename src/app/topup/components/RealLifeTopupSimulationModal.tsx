@@ -17,7 +17,8 @@ import {
   RefreshCw,
   ShieldCheck
 } from "lucide-react";
-import { TopupMethod, CreateTopupDto } from "@/types/api";
+import { paymentMethodsService } from "@/services/payment-methods.service";
+import { TopupMethod, CreateTopupDto, PaymentMethodOption } from "@/types/api";
 
 export interface SimulationCustomerData {
   id: string;
@@ -71,6 +72,23 @@ export function RealLifeTopupSimulationModal({
   const [notes, setNotes] = useState<string>("Simulation NFC Reader Topup");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<PaymentMethodOption[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      paymentMethodsService.getOptions()
+        .then((opts) => {
+          if (Array.isArray(opts) && opts.length > 0) {
+            setPaymentMethodOptions(opts);
+            const firstMethod = opts[0];
+            const firstBanks = firstMethod.banks || [];
+            setMethod((firstMethod.code || "qris") as TopupMethod);
+            setBank(firstBanks.length > 0 ? firstBanks[0].code : "");
+          }
+        })
+        .catch((err) => console.error("Failed to load payment options in simulation", err));
+    }
+  }, [isOpen]);
 
   // Handle 5-second scanning timer
   useEffect(() => {
@@ -130,6 +148,12 @@ export function RealLifeTopupSimulationModal({
       setSubmitting(false);
     }
   };
+
+  const selectedMethodObj = paymentMethodOptions.find(
+    (pm) => pm.code === method || pm.id === method
+  );
+  const availableBanks = selectedMethodObj?.banks || [];
+  const hasBanks = availableBanks.length > 0;
 
   if (!isOpen) return null;
 
@@ -341,8 +365,8 @@ export function RealLifeTopupSimulationModal({
                         type="button"
                         onClick={() => setAmount(amt)}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-mono border transition-colors ${amount === amt
-                            ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
-                            : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
+                          ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/50"
+                          : "bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700"
                           }`}
                       >
                         +{amt / 1000}k
@@ -358,28 +382,53 @@ export function RealLifeTopupSimulationModal({
                   </label>
                   <select
                     value={method}
-                    onChange={(e) => setMethod(e.target.value as TopupMethod)}
+                    onChange={(e) => {
+                      const newMethod = e.target.value as TopupMethod;
+                      const targetObj = paymentMethodOptions.find(
+                        (pm) => pm.code === newMethod || pm.id === newMethod
+                      );
+                      const targetBanks = targetObj?.banks || [];
+                      setMethod(newMethod);
+                      setBank(targetBanks.length > 0 ? targetBanks[0].code : "");
+                    }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                   >
-                    <option value="qris">Midtrans QRIS Dynamic QR</option>
-                    <option value="va">Midtrans Virtual Account (BCA / Mandiri)</option>
-                    <option value="transfer">Direct Bank Transfer</option>
-                    <option value="cash">Direct Cash Deposit (Tunai Kasir)</option>
+                    {paymentMethodOptions.length > 0 ? (
+                      paymentMethodOptions.map((pm) => (
+                        <option key={pm.id || pm.code} value={pm.code}>
+                          {pm.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="qris">Midtrans QRIS Dynamic QR</option>
+                        <option value="va">Midtrans Virtual Account (BCA / Mandiri)</option>
+                        <option value="transfer">Direct Bank Transfer</option>
+                        <option value="cash">Direct Cash Deposit (Tunai Kasir)</option>
+                      </>
+                    )}
                   </select>
 
-                  {method === "va" && (
-                    <div className="mt-2">
-                      <label className="text-xs font-medium text-slate-300 block mb-1.5">Select Bank</label>
+                  {hasBanks && (
+                    <div className="mt-3.5 space-y-1.5 animate-in fade-in duration-200">
+                      <label className="text-xs font-medium text-slate-300 block mb-1 items-center justify-between">
+                        <span>Select Bank</span>
+                        <span className="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-bold">
+                          * Required
+                        </span>
+                      </label>
                       <select
+                        required
                         value={bank}
                         onChange={(e) => setBank(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
                       >
-                        <option value="bca">BCA</option>
-                        <option value="mandiri">Mandiri</option>
-                        <option value="bni">BNI</option>
-                        <option value="bri">BRI</option>
-                        <option value="permata">Permata</option>
+                        <option value="" disabled>-- Select Bank --</option>
+                        {availableBanks.map((b) => (
+                          <option key={b.id || b.code} value={b.code}>
+                            {b.name} ({b.code.toUpperCase()})
+                          </option>
+                        ))}
                       </select>
                     </div>
                   )}
